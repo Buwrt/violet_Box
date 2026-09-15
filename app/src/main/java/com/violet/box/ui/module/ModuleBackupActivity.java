@@ -238,6 +238,35 @@ public class ModuleBackupActivity extends AppCompatActivity {
                 e.printStackTrace();
             }
 
+            // Embed 路线：APatch「已嵌入」的 KPM 在 boot/init_boot 镜像里，没有独立文件。
+            // 从分区流式抠出（su cat -> kpe 头链 -> payload ELF），抠出的副本可直接打包。
+            try {
+                KpmShell.BootScan bs = KpmShell.scanEmbeddedBoot(new File(getCacheDir(), "kpm_embedded"));
+                if (bs != null) {
+                    for (KpmInfo info : bs.items) {
+                        boolean dup = false;
+                        for (ModuleItem e : list) {
+                            if (e.id.equals(info.id())) {
+                                dup = true;
+                                break;
+                            }
+                        }
+                        if (dup) continue;
+                        ModuleItem item = new ModuleItem();
+                        item.isKpm = true;
+                        item.dir = info.path; // 抠出的可读副本
+                        item.id = info.id();
+                        item.name = info.displayName() + "（已嵌入）";
+                        item.version = info.version == null ? "" : info.version;
+                        item.author = info.author == null ? "" : info.author;
+                        item.description = info.description == null ? "" : info.description;
+                        list.add(item);
+                    }
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+
             mainHandler.post(() -> {
                 moduleList.clear();
                 moduleList.addAll(list);
@@ -245,8 +274,8 @@ public class ModuleBackupActivity extends AppCompatActivity {
                 boolean empty = list.isEmpty();
                 tvStatus.setText(empty ? "未找到内核模块" : "共找到 " + list.size() + " 个内核模块");
                 tvBackupEmpty.setVisibility(empty ? View.VISIBLE : View.GONE);
-                // 空列表 ≠ ROOT 失败：环境正常但设备上确实还没刷入任何 KPM 时，把话说清楚
-                tvBackupEmpty.setText("还没有已刷入的内核模块\n\nROOT 正常，但设备上没有安装任何 KPM。\n可到「玩机 → KPM刷写」刷入，重启后即可在这里备份。");
+                // 空列表 ≠ ROOT 失败：环境正常但设备上确实没有 KPM 时，把话说清楚
+                tvBackupEmpty.setText("还没有可备份的内核模块\n\nROOT 正常，但没有找到已刷入或已嵌入的 KPM。\n已刷入的看 /data/adb/ap/kpm/，已嵌入的看 boot 镜像。\n可到「玩机 → KPM刷写」刷入，重启后即可在这里备份。");
                 cbSelectAll.setChecked(false);
                 updateFabState();
             });

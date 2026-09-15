@@ -1,6 +1,7 @@
 package com.violet.box.kpm;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
@@ -211,6 +212,113 @@ public final class KpmShell {
             }
         }
         return out;
+    }
+
+    // ------------------------------------------------------- embedded (boot image)
+
+    /** Embedded-KPM scan result for one boot image partition. */
+    public static final class BootScan {
+        /** Block device that was scanned, e.g. /dev/block/by-name/boot_a. */
+        public final String partition;
+        /** One KpmInfo per embedded KPM; info.path points at the carved scratch copy. */
+        public final List<KpmInfo> items;
+
+        BootScan(String partition, List<KpmInfo> items) {
+            this.partition = partition;
+            this.items = items;
+        }
+    }
+
+    /**
+     * Finds the patched boot image and carves the KPMs embedded in it (the "Embed" route,
+     * shown by APatch as 「已嵌入」) into {@code outDir} (an app-writable cache dir).
+     *
+     * <p>The partition is streamed through {@code su -c cat} so no permissions beyond root
+     * are needed and nothing large is held in memory. Returns null when no candidate
+     * partition carries embedded KPMs.
+     */
+    public static BootScan scanEmbeddedBoot(File outDir) {
+        // stale carve output from an earlier scan
+        if (outDir.isDirectory()) {
+            File[] stale = outDir.listFiles();
+            if (stale != null) for (File f : stale) f.delete();
+        } else {
+            outDir.mkdirs();
+        }
+
+        String suffix = exec("getprop ro.boot.slot_suffix 2>/dev/null").out.trim();
+        List<String> names = new ArrayList<>();
+        if (suffix.startsWith("_")) {
+            names.add("boot" + suffix);
+            names.add("init_boot" + suffix);
+        }
+        names.add("boot");
+        names.add("boot_a");
+        names.add("boot_b");
+        names.add("init_boot");
+        names.add("init_boot_a");
+        names.add("init_boot_b");
+
+        StringBuilder script = new StringBuilder();
+        for (String n : names) {
+            for (String base : new String[]{"/dev/block/by-name", "/dev/block/bootdevice/by-name"}) {
+                script.append("p=\"").append(base).append('/').append(n).append("\"; ")
+                        .append("if [ -e \"$p\" ]; then echo \"$p\"; fi; ");
+            }
+        }
+        java.util.LinkedHashSet<String> devs = new java.util.LinkedHashSet<>();
+        for (String line : exec(script.toString(), 15000).out.split("\n")) {
+            String s = line.trim();
+            if (s.startsWith("/dev/")) devs.add(s);
+        }
+
+        int tried = 0;
+        for (String dev : devs) {
+            if (tried >= 4) break;
+            Result sz = exec("blockdev --getsize64 '" + q(dev) + "' 2>/dev/null");
+            try {
+                long size = Long.parseLong(sz.out.trim());
+                if (size > 512L * 1024 * 1024) continue; // never cat something absurd
+            } catch (Exception ignored) {
+            }
+            tried++;
+            List<KpmEmbedded.Item> items = scanDevice(dev, outDir);
+            List<KpmInfo> infos = new ArrayList<>();
+            for (KpmEmbedded.Item it : items) {
+                if (it.file != null && it.info != null) infos.add(it.info);
+            }
+            if (!infos.isEmpty()) return new BootScan(dev, infos);
+        }
+        return null;
+    }
+
+    private static List<KpmEmbedded.Item> scanDevice(String dev, File outDir) {
+        Process p = null;
+        try {
+            p = new ProcessBuilder("su", "-c", "cat '" + q(dev) + "'").redirectErrorStream(false).start();
+            final Process proc = p;
+            Thread errDrain = new Thread(() -> {
+                try (java.io.InputStream e = proc.getErrorStream()) {
+                    byte[] b = new byte[4096];
+                    while (e.read(b) >= 0) { /* discard */ }
+                } catch (Exception ignored) {
+                }
+            });
+            errDrain.setDaemon(true);
+            errDrain.start();
+            try (java.io.InputStream in = p.getInputStream()) {
+                return KpmEmbedded.scan(in, outDir);
+            }
+        } catch (Exception e) {
+            return new ArrayList<>();
+        } finally {
+            if (p != null) {
+                try {
+                    p.destroy();
+                } catch (Exception ignored) {
+                }
+            }
+        }
     }
 
     // -------------------------------------------------------------- operations

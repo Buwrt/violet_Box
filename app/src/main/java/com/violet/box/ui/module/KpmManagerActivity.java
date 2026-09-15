@@ -78,11 +78,25 @@ public class KpmManagerActivity extends AppCompatActivity {
         final KpmInfo info;
         final boolean installed;
         final boolean disabled;
+        /** True for KPMs carved out of the boot image (the Embed route, APatch 「已嵌入」). */
+        final boolean embedded;
+        /** For embedded rows: the block device the KPM was carved from. */
+        final String bootDevice;
+        /** For embedded rows: app-readable carved .kpm in our cache dir. */
+        final String embeddedFile;
 
         Row(KpmInfo info, boolean installed, boolean disabled) {
+            this(info, installed, disabled, false, null, null);
+        }
+
+        Row(KpmInfo info, boolean installed, boolean disabled, boolean embedded,
+            String bootDevice, String embeddedFile) {
             this.info = info;
             this.installed = installed;
             this.disabled = disabled;
+            this.embedded = embedded;
+            this.bootDevice = bootDevice;
+            this.embeddedFile = embeddedFile;
         }
     }
 
@@ -169,6 +183,20 @@ public class KpmManagerActivity extends AppCompatActivity {
                 fileRows.add(new Row(info, false, false));
             }
 
+            // Embed 路线：KPM 被合进了 boot/init_boot 镜像，磁盘上没有独立文件。
+            // 从分区流式抠出来解析（su cat -> 内核里的 kpe 头链 -> payload ELF）。
+            List<Row> embeddedRows = new ArrayList<>();
+            String bootDev = null;
+            if (root) {
+                KpmShell.BootScan bs = KpmShell.scanEmbeddedBoot(new File(getCacheDir(), "kpm_embedded"));
+                if (bs != null) {
+                    bootDev = bs.partition;
+                    for (KpmInfo info : bs.items) {
+                        embeddedRows.add(new Row(info, false, false, true, bs.partition, info.path));
+                    }
+                }
+            }
+
             final StringBuilder env1 = new StringBuilder();
             env1.append("ROOT：").append(root ? "已获取" : "未获取（无法刷入）");
             final StringBuilder env2 = new StringBuilder();
@@ -177,6 +205,14 @@ public class KpmManagerActivity extends AppCompatActivity {
             final StringBuilder env3 = new StringBuilder();
             env3.append("模块目录：").append(KpmShell.KPMS_DIR)
                     .append(root ? (apatch ? "（就绪）" : "（APatch 不在，刷入后不会被加载）") : "（需 ROOT 才能读取）");
+            if (root) {
+                env3.append("\n嵌入检测：");
+                if (bootDev != null) {
+                    env3.append("在 ").append(bootDev).append(" 中发现 ").append(embeddedRows.size()).append(" 个已嵌入的 KPM");
+                } else {
+                    env3.append("boot / init_boot 镜像中未发现嵌入的 KPM");
+                }
+            }
 
             main.post(() -> {
                 envRoot.setText(env1.toString());
@@ -187,6 +223,10 @@ public class KpmManagerActivity extends AppCompatActivity {
                 if (!installedRows.isEmpty()) {
                     rows.add("已刷入（" + installedRows.size() + "）");
                     rows.addAll(installedRows);
+                }
+                if (!embeddedRows.isEmpty()) {
+                    rows.add("已嵌入 · boot 镜像（" + embeddedRows.size() + "）");
+                    rows.addAll(embeddedRows);
                 }
                 if (!fileRows.isEmpty()) {
                     rows.add("可刷入的文件（" + fileRows.size() + "）");
@@ -446,9 +486,26 @@ public class KpmManagerActivity extends AppCompatActivity {
             if (info.version != null && !info.version.isEmpty()) m.append(" | v").append(info.version);
             if (info.license != null && !info.license.isEmpty()) m.append(" | ").append(info.license);
             meta.setText(m.toString());
-            path.setText(info.path == null ? "" : info.path);
+            path.setText(row.embedded
+                    ? "嵌入于 " + row.bootDevice
+                    : (info.path == null ? "" : info.path));
 
             badge.setText("KPM");
+            if (row.embedded) {
+                // 已嵌入：随内核启动，不能用文件开关启停/卸载，只能导出备份
+                state.setText("已嵌入");
+                state.setTextColor(getResources().getColor(R.color.explore_emerald_600));
+                btnInstall.setVisibility(View.VISIBLE);
+                btnInstall.setText("导出");
+                btnToggle.setVisibility(View.GONE);
+                btnUninstall.setVisibility(View.GONE);
+                btnInstall.setOnClickListener(v -> {
+                    if (!ensureRoot()) return;
+                    exportEmbedded(row);
+                });
+                return;
+            }
+            btnInstall.setText("刷入");
             if (row.installed) {
                 state.setText(row.disabled ? "已禁用" : "已启用");
                 state.setTextColor(getResources().getColor(row.disabled
@@ -488,5 +545,38 @@ public class KpmManagerActivity extends AppCompatActivity {
             return false;
         }
         return true;
+    }
+
+    /** Copies a carved embedded .kpm to the app's Download dir so the user can keep it. */
+    private void exportEmbedded(Row row) {
+        if (row.embeddedFile == null) {
+            toast("导出失败：找不到抠出的 KPM 文件");
+            return;
+        }
+        busy(true);
+        io.execute(() -> {
+            try {
+                File src = new File(row.embeddedFile);
+                File dir = new File(getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS), "VioletBox");
+                if (!dir.isDirectory()) dir.mkdirs();
+                String base = KpmInfo.safeId(row.info.displayName());
+                File dst = new File(dir, base + ".kpm");
+                try (java.io.InputStream in = new java.io.FileInputStream(src);
+                     java.io.FileOutputStream out = new java.io.FileOutputStream(dst)) {
+                    byte[] buf = new byte[8192];
+                    int n;
+                    while ((n = in.read(buf)) >= 0) out.write(buf, 0, n);
+                }
+                main.post(() -> {
+                    busy(false);
+                    toast("已导出：" + dst.getAbsolutePath());
+                });
+            } catch (Exception e) {
+                main.post(() -> {
+                    busy(false);
+                    toast("导出失败：" + e.getMessage());
+                });
+            }
+        });
     }
 }
