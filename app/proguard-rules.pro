@@ -24,3 +24,9 @@
 #-keepclassmembers class fqcn.of.javascript.interface.for.webview {
 #   public *;
 #}
+
+# 环境检测（从 b42df36 捞回）：保持类名与成员不变，使发布包能与上游源码逐一对照，
+# 也避免 R8 把 RootDetector / RootBeer 竖向合并后难以定位问题
+-keep class com.violet.box.data.detector.** { *; }
+-keep class com.violet.box.ui.detect.** { *; }
+-keep class com.scottyab.rootbeer.** { *; }

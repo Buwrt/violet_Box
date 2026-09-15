@@ -82,6 +82,10 @@
         <activity
             android:name=".ui.about.AboutActivity"
             android:exported="false" />
+        <activity
+            android:name=".ui.repo.ModuleRepoActivity"
+            android:exported="false" />
+
 
         <provider
             android:name="androidx.core.content.FileProvider"

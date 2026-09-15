@@ -16,6 +16,7 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -47,6 +48,23 @@ public class SafetyPageController implements SafetyAppAdapter.OnToggleListener {
     private static final String SHIZUKU_PACKAGE = "moe.shizuku.privileged.api";
     private static final String SHIZUKU_URL = "https://shizuku.rikka.app/zh-hans/";
     private static final String KEY_SHOW_SYSTEM = "show_system_apps";
+    /** Mirror of MainActivity.KEY_SAFETY_SHAKE_MODE - kept here so the tab can hide itself. */
+    private static final String PREFS_NAME = "violet_detection_logs";
+    private static final String KEY_SAFETY_SHAKE_MODE = "safety_shake_mode";
+
+    /**
+     * What the safety tab is currently showing.
+     *
+     * <p>{@link #DETECTION} is the product default: the tab behaves as an environment / integrity
+     * detection surface. {@link #SHAKE_GUARD} is the opt-in mode that gates the accelerometer of
+     * chosen apps so "shake to open" ads cannot fire.
+     *
+     * <p>DETECTION hosts the environment-detection panel restored from b42df36 (RootBeer baseline
+     * plus the project's own RootDetector). SHAKE_GUARD hosts the accelerometer gate. Switching
+     * mode only swaps which branch of the safety layout is visible - {@link #renderDetection()} and
+     * {@link #renderShakeGuard()} - so neither mode carries the other's state.
+     */
+    public enum Mode { DETECTION, SHAKE_GUARD }
     // Survives Activity recreation. Accepted operations finish journaling before a new
     // controller reads preferences; destroying a screen never interrupts a mutation.
     private static final ExecutorService IO = Executors.newSingleThreadExecutor(r -> new Thread(r, "sensor-guard"));
@@ -102,6 +120,11 @@ public class SafetyPageController implements SafetyAppAdapter.OnToggleListener {
 
     private TextView tvStatus, tvDetail, tvCmdState;
     private androidx.swiperefreshlayout.widget.SwipeRefreshLayout swipeRefresh;
+    /** DETECTION mode host: the restored environment-detection panel is inflated in here. */
+    private View detectScroll;
+    private LinearLayout detectHost;
+    private View detectPanel;
+    private boolean detectionRan;
     private Chip chipRestoreAll;
     private TextView tvProtectCount;
     private ImageView ivIcon;
@@ -121,6 +144,8 @@ public class SafetyPageController implements SafetyAppAdapter.OnToggleListener {
     private SafetyShell.Support support = SafetyShell.Support.UNKNOWN;
     private long reconciledEpoch = -1;
     private boolean retryNeeded = true;
+    /** Default per product decision: the tab is a detection surface unless the user opts in. */
+    private volatile Mode mode = Mode.DETECTION;
     private String message = "";
 
     public SafetyPageController(Activity activity) {
@@ -137,7 +162,12 @@ public class SafetyPageController implements SafetyAppAdapter.OnToggleListener {
         cardStatus = activity.findViewById(R.id.cardSafetyStatus);
         swipeRefresh = activity.findViewById(R.id.swipeSafetyRefresh);
         swipeRefresh.setOnRefreshListener(this::triggerRefresh);
-        swipeRefresh.setOnChildScrollUpCallback((parent, child) -> rv != null && rv.canScrollVertically(-1));
+        swipeRefresh.setOnChildScrollUpCallback((parent, child) -> {
+            if (mode == Mode.DETECTION) return detectScroll != null && detectScroll.canScrollVertically(-1);
+            return rv != null && rv.canScrollVertically(-1);
+        });
+        detectScroll = activity.findViewById(R.id.detectScrollView);
+        detectHost = activity.findViewById(R.id.layoutDetectHost);
         // 点击状态卡：未安装 Shizuku 时前往下载，其余情况等效于下拉刷新
         cardStatus.setOnClickListener(v -> {
             if (detectShizuku() == ShizukuUi.NOT_INSTALLED) {
@@ -174,6 +204,12 @@ public class SafetyPageController implements SafetyAppAdapter.OnToggleListener {
         Shizuku.addBinderReceivedListenerSticky(receivedListener);
         Shizuku.addBinderDeadListener(deadListener);
         Shizuku.addRequestPermissionResultListener(permissionListener);
+
+        // Read the persisted mode before the first render, otherwise the tab flashes the guard
+        // chrome for a frame before setMode() hides it.
+        mode = prefs().getBoolean(KEY_SAFETY_SHAKE_MODE, false)
+                ? Mode.SHAKE_GUARD
+                : Mode.DETECTION;
         onMaybeShown();
     }
 
@@ -190,12 +226,98 @@ public class SafetyPageController implements SafetyAppAdapter.OnToggleListener {
     public void onMaybeShown() {
         main.post(() -> {
             if (destroyed) return;
+            if (mode == Mode.DETECTION) {
+                renderDetection();
+                return;
+            }
             if (busy) {
                 refreshPending = true;
                 return;
             }
             submit(this::refresh);
         });
+    }
+
+    /**
+     * Switch what the tab renders. Called from MainActivity when the settings toggle flips, and
+     * once on startup after the persisted preference is read.
+     */
+    public void setMode(Mode next) {
+        if (next == null) return;
+        if (activity == null) {           // too early: initialize() has not bound the views yet
+            mode = next;
+            return;
+        }
+        if (next == mode) {
+            if (mode == Mode.DETECTION) main.post(this::renderDetection);
+            return;
+        }
+        mode = next;
+        if (mode == Mode.DETECTION) {
+            // Guard is meaningless while the detector owns the screen; release the shell so we
+            // stop holding a Shizuku binder the user is no longer using.
+            IO.execute(SafetyShell::release);
+            main.post(this::renderDetection);
+            return;
+        }
+        main.post(this::renderShakeGuard);
+        onMaybeShown();
+    }
+
+    public Mode getMode() {
+        return mode;
+    }
+
+    /**
+     * Hide every guard-only view and host the restored environment-detection panel.
+     *
+     * <p>The panel is inflated lazily and kept: re-entering the tab re-runs the sweep rather than
+     * rebuilding the tree, so the scroll position survives a tab switch.
+     */
+    private void renderDetection() {
+        renderDetection(false);
+    }
+
+    private void renderDetection(boolean force) {
+        if (destroyed || activity == null) return;
+        hideGuardChrome(true);
+        if (cardStatus != null) cardStatus.setVisibility(View.GONE);
+        if (detectScroll == null || detectHost == null) return;
+        detectScroll.setVisibility(View.VISIBLE);
+        if (detectPanel == null) {
+            detectPanel = activity.getLayoutInflater().inflate(R.layout.fragment_detect, detectHost, false);
+            detectHost.addView(detectPanel);
+        }
+        // onMaybeShown fires on every tab switch; re-runnning the sweep there would shell out to
+        // getprop/cat ~20 times per page view and blank the list mid-scroll. Only an explicit
+        // pull-to-refresh (or the panel's own button) re-scans.
+        if (force || !detectionRan) {
+            detectionRan = true;
+            com.violet.box.ui.detect.DetectViewBinder.bind(detectPanel, context);
+        }
+        if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
+    }
+
+    /** Restore the guard views before the next refresh populates them. */
+    private void renderShakeGuard() {
+        if (destroyed || activity == null) return;
+        hideGuardChrome(false);
+        if (detectScroll != null) detectScroll.setVisibility(View.GONE);
+        if (cardStatus != null) cardStatus.setVisibility(View.VISIBLE);
+        if (tvCmdState != null) tvCmdState.setVisibility(View.VISIBLE);
+        if (rv != null) rv.setVisibility(View.VISIBLE);
+    }
+
+    private void hideGuardChrome(boolean detectionMode) {
+        if (activity == null) return;
+        int[] guardOnly = {
+                R.id.chipRestoreAll, R.id.chipShowSystem, R.id.etSafetySearch,
+                R.id.tvProtectCount, R.id.rvSafetyApps,
+        };
+        for (int id : guardOnly) {
+            View v = activity.findViewById(id);
+            if (v != null) v.setVisibility(detectionMode ? View.GONE : View.VISIBLE);
+        }
     }
 
     /**
@@ -289,6 +411,11 @@ public class SafetyPageController implements SafetyAppAdapter.OnToggleListener {
 
     /** 下拉刷新/点击状态卡的重新检测；未授权时下拉即发起授权请求。 */
     private void triggerRefresh() {
+        // In detection mode a pull gesture re-runs the sweep; Shizuku is irrelevant there.
+        if (mode == Mode.DETECTION) {
+            renderDetection(true);
+            return;
+        }
         ShizukuUi current = detectShizuku();
         if (current == ShizukuUi.UNAUTHORIZED) {
             try {

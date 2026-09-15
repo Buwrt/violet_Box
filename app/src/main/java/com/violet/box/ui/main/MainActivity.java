@@ -81,6 +81,12 @@ public class MainActivity extends AppCompatActivity {
     // Prefs 名沿用旧的检测日志存储名，保留用户已有的自动检查更新开关状态
     private static final String PREFS_NAME = "violet_detection_logs";
     private static final String KEY_AUTO_CHECK_UPDATE = "auto_check_update";
+    /**
+     * Safety tab mode. false (default) = environment detection view, true = shake-ad guard.
+     * Kept in the same prefs file the detection logs used to live in, so existing installs keep
+     * their choice across upgrades.
+     */
+    private static final String KEY_SAFETY_SHAKE_MODE = "safety_shake_mode";
     private static final String UPDATE_JSON_URL = "https://gitee.com/smartpaocai/smart-tool/raw/master/violetbox.json";
     private static final long EXPLORE_ROOT_STATUS_CACHE_MS = 5_000L;
 
@@ -227,6 +233,13 @@ public class MainActivity extends AppCompatActivity {
         if (btnDeviceIdModify != null) {
             btnDeviceIdModify.setOnClickListener(v ->
                     startActivity(new Intent(this, DeviceIdModifyActivity.class)));
+
+        View btnModuleRepo = findViewById(R.id.btnModuleRepo);
+        if (btnModuleRepo != null) {
+            btnModuleRepo.setOnClickListener(v ->
+                    startActivity(new Intent(this, 
+                            com.violet.box.ui.repo.ModuleRepoActivity.class)));
+        }
         }
         View cardGithubRepo = findViewById(R.id.cardGithubRepo);
         if (cardGithubRepo != null) {
@@ -274,6 +287,29 @@ public class MainActivity extends AppCompatActivity {
         } else {
             hideNewVersionCard();
         }
+
+        // Safety tab mode: off (default) = environment detection, on = shake-ad guard.
+        com.violet.box.ui.widget.KsuSwitchView switchSafetyMode =
+                findViewById(R.id.switchSafetyMode);
+        TextView tvSafetyModeHint = findViewById(R.id.tvSafetyModeHint);
+        if (switchSafetyMode != null) {
+            switchSafetyMode.setChecked(updatePrefs.getBoolean(KEY_SAFETY_SHAKE_MODE, false));
+            switchSafetyMode.setOnCheckedChange(isChecked -> {
+                updatePrefs.edit().putBoolean(KEY_SAFETY_SHAKE_MODE, isChecked).apply();
+                applySafetyMode(isChecked);
+                if (tvSafetyModeHint != null) {
+                    tvSafetyModeHint.setText(isChecked
+                            ? "已开启：安全页限制指定应用的加速度传感器"
+                            : "关闭时安全页显示环境检测");
+                }
+            });
+            if (tvSafetyModeHint != null) {
+                tvSafetyModeHint.setText(switchSafetyMode.isChecked()
+                        ? "已开启：安全页限制指定应用的加速度传感器"
+                        : "关闭时安全页显示环境检测");
+            }
+        }
+        applySafetyMode(updatePrefs.getBoolean(KEY_SAFETY_SHAKE_MODE, false));
         int defaultTab = 0;
         Intent intent = getIntent();
         if (intent != null && intent.hasExtra(EXTRA_OPEN_TAB)) {
@@ -307,6 +343,10 @@ public class MainActivity extends AppCompatActivity {
 
         safetyPageController = new SafetyPageController(this);
         safetyPageController.initialize();
+        // Default off => the tab renders as the detection surface, not the shake guard.
+        safetyPageController.setMode(updatePrefs.getBoolean(KEY_SAFETY_SHAKE_MODE, false)
+                ? SafetyPageController.Mode.SHAKE_GUARD
+                : SafetyPageController.Mode.DETECTION);
 
         // 预热一次 Expressive 开关组合：首次组合的类加载/JIT 成本在启动期消化，
         // 避免首次进入安全页时集中付出（1×1 隐藏视图，首帧绘制后即移除）
@@ -920,8 +960,18 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void updateExploreRootStatus(boolean forceRefresh) {
-        TextView tvExploreRootStatus = findViewById(R.id.tvExploreRootStatus);
+    /**
+     * Boolean-shaped wrapper around {@link SafetyPageController#setMode}. true = shake-ad guard,
+     * false = detection surface (the default).
+     */
+    private void applySafetyMode(boolean shakeGuardEnabled) {
+        if (safetyPageController == null) return;
+        safetyPageController.setMode(shakeGuardEnabled
+                ? SafetyPageController.Mode.SHAKE_GUARD
+                : SafetyPageController.Mode.DETECTION);
+    }
+
+    private void updateExploreRootStatus(boolean forceRefresh) {        TextView tvExploreRootStatus = findViewById(R.id.tvExploreRootStatus);
         TextView tvExploreRootManager = findViewById(R.id.tvExploreRootManager);
         ImageView ivExploreRootStatusIcon = findViewById(R.id.ivExploreRootStatusIcon);
         MaterialCardView cardExploreRootStatusIconBg = findViewById(R.id.cardExploreRootStatusIconBg);

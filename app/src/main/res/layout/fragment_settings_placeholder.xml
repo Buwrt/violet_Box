@@ -56,6 +56,54 @@
         </com.google.android.material.card.MaterialCardView>
 
         <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardSafetyMode"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            app:cardBackgroundColor="@color/ios_card"
+            app:cardCornerRadius="@dimen/ios_card_corner"
+            app:cardElevation="0dp"
+            app:strokeColor="@color/ios_glass_stroke"
+            app:strokeWidth="1dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:padding="@dimen/ios_card_padding">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="安全页使用摇一摇防护"
+                        android:textAppearance="@style/Widget.IOS.SubsectionTitle"
+                        android:textColor="@color/ios_text_primary" />
+
+                    <TextView
+                        android:id="@+id/tvSafetyModeHint"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="关闭时安全页显示环境检测"
+                        android:textAppearance="@style/Widget.IOS.Body"
+                        android:textColor="@color/ios_text_secondary" />
+                </LinearLayout>
+
+                <com.violet.box.ui.widget.KsuSwitchView
+                    android:id="@+id/switchSafetyMode"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <com.google.android.material.card.MaterialCardView
             android:id="@+id/cardGithubRepo"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

@@ -200,6 +200,29 @@
                 android:overScrollMode="never"
                 android:paddingBottom="104dp" />
 
+            <!-- 环境检测（默认安全页）：由 SafetyPageController 在 DETECTION 模式下填充。
+                 负边距 = -ios_screen_edge(16dp)，抵消父布局的左右内边距，让检测页的
+                 #F5F5F5 底色满幅铺开，内边距改由 fragment_detect 自身的 16dp 提供。 -->
+            <androidx.core.widget.NestedScrollView
+                android:id="@+id/detectScrollView"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:visibility="gone"
+                android:clipToPadding="false"
+                android:overScrollMode="never"
+                android:paddingBottom="104dp"
+                android:layout_marginStart="-16dp"
+                android:layout_marginEnd="-16dp">
+
+                <LinearLayout
+                    android:id="@+id/layoutDetectHost"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical" />
+
+            </androidx.core.widget.NestedScrollView>
+
         </LinearLayout>
             </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
     </FrameLayout>
