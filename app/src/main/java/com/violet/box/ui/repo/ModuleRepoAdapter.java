@@ -81,17 +81,18 @@ final class ModuleRepoAdapter extends RecyclerView.Adapter<ModuleRepoAdapter.Hol
 
             boolean kpm = entry.isKpm();
             type.setText(kpm ? "KPM" : "ZIP");
-            // tint badge background so the two kinds stay distinguishable at a glance
+            // tint badge so the two kinds stay distinguishable at a glance:
+            // ZIP = 紫罗兰（与应用主色一致），KPM = 青（与备份页强调色一致）
             Drawable badge = type.getBackground();
             if (badge != null) {
                 int color = itemView.getResources().getColor(kpm
-                        ? com.violet.box.R.color.explore_emerald_600
-                        : com.violet.box.R.color.purple_200);
+                        ? com.violet.box.R.color.explore_cyan_600
+                        : com.violet.box.R.color.ios_accent);
                 badge.mutate();
                 badge.setTint(color);
                 type.setBackground(badge);
             }
-            download.setText(kpm ? "下载\n最新" : "下载\n最新");
+            download.setText("下载最新");
 
             itemView.setOnClickListener(v -> {
                 if (listener != null) listener.onPickVersion(entry);

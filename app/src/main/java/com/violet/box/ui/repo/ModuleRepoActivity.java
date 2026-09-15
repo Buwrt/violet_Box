@@ -1,6 +1,5 @@
 package com.violet.box.ui.repo;
 
-import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.Intent;
@@ -12,6 +11,8 @@ import android.os.Handler;
 import android.os.Looper;
 import android.text.TextUtils;
 import android.view.LayoutInflater;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ProgressBar;
@@ -19,6 +20,8 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.Toolbar;
 import androidx.core.content.FileProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -62,7 +65,7 @@ import okhttp3.ResponseBody;
  * "Can't create handler inside thread ... that has not called Looper.prepare()" and hides the
  * real error behind a useless message.
  */
-public class ModuleRepoActivity extends Activity {
+public class ModuleRepoActivity extends AppCompatActivity {
 
     /** Point this at a raw file in your own repo to update the catalog without releasing an APK. */
     private static final String CATALOG_URL =
@@ -105,8 +108,10 @@ public class ModuleRepoActivity extends Activity {
         clearSearch = findViewById(R.id.btnRepoClearSearch);
         count = findViewById(R.id.tvRepoCount);
 
-        findViewById(R.id.btnRepoBack).setOnClickListener(v -> finish());
-        findViewById(R.id.tvRepoRefresh).setOnClickListener(v -> fetchRemoteCatalog());
+        // 原生标题栏：返回箭头 + 「刷新清单」菜单，与「模块备份」页保持同一套 UI
+        Toolbar toolbar = findViewById(R.id.toolbar);
+        setSupportActionBar(toolbar);
+        toolbar.setNavigationOnClickListener(v -> finish());
 
         recycler.setLayoutManager(new LinearLayoutManager(this));
         adapter = new ModuleRepoAdapter(visible, new ModuleRepoAdapter.Listener() {
@@ -142,6 +147,21 @@ public class ModuleRepoActivity extends Activity {
         swipe.setOnRefreshListener(this::fetchRemoteCatalog);
 
         loadLocalCatalog();
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(@NonNull Menu menu) {
+        getMenuInflater().inflate(R.menu.menu_repo, menu);
+        return true;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
+        if (item.getItemId() == R.id.action_repo_refresh) {
+            fetchRemoteCatalog();
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
     }
 
     @Override

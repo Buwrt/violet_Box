@@ -45,6 +45,7 @@ public class ModuleBackupActivity extends AppCompatActivity {
     private ModuleAdapter adapter;
     private CheckBox cbSelectAll;
     private TextView tvStatus;
+    private TextView tvBackupEmpty;
     private ExtendedFloatingActionButton fabBackup;
     private final List<ModuleItem> moduleList = new ArrayList<>();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
@@ -76,6 +77,7 @@ public class ModuleBackupActivity extends AppCompatActivity {
         recyclerView = findViewById(R.id.recyclerView);
         cbSelectAll = findViewById(R.id.cbSelectAll);
         tvStatus = findViewById(R.id.tvStatus);
+        tvBackupEmpty = findViewById(R.id.tvBackupEmpty);
         fabBackup = findViewById(R.id.fabBackup);
 
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
@@ -170,7 +172,10 @@ public class ModuleBackupActivity extends AppCompatActivity {
                 moduleList.clear();
                 moduleList.addAll(list);
                 adapter.notifyDataSetChanged();
-                tvStatus.setText("共找到 " + list.size() + " 个模块");
+                boolean empty = list.isEmpty();
+                tvStatus.setText(empty ? "未找到系统模块" : "共找到 " + list.size() + " 个模块");
+                tvBackupEmpty.setVisibility(empty ? View.VISIBLE : View.GONE);
+                tvBackupEmpty.setText("未找到系统模块\n\n已安装的 Magisk / KSU / APatch 模块会出现在这里。\n如果装了模块却看不到，请先授予 ROOT 权限。");
                 cbSelectAll.setChecked(false);
                 updateFabState();
             });
@@ -237,9 +242,11 @@ public class ModuleBackupActivity extends AppCompatActivity {
                 moduleList.clear();
                 moduleList.addAll(list);
                 adapter.notifyDataSetChanged();
-                tvStatus.setText(list.isEmpty()
-                        ? "未找到内核模块（需 ROOT，且 KPM 需已刷入）"
-                        : "共找到 " + list.size() + " 个内核模块");
+                boolean empty = list.isEmpty();
+                tvStatus.setText(empty ? "未找到内核模块" : "共找到 " + list.size() + " 个内核模块");
+                tvBackupEmpty.setVisibility(empty ? View.VISIBLE : View.GONE);
+                // 空列表 ≠ ROOT 失败：环境正常但设备上确实还没刷入任何 KPM 时，把话说清楚
+                tvBackupEmpty.setText("还没有已刷入的内核模块\n\nROOT 正常，但设备上没有安装任何 KPM。\n可到「玩机 → KPM刷写」刷入，重启后即可在这里备份。");
                 cbSelectAll.setChecked(false);
                 updateFabState();
             });

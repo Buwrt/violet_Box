@@ -94,13 +94,33 @@
             android:layout_height="1dp"
             android:background="@color/explore_slate_100" />
 
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/recyclerView"
+        <FrameLayout
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_weight="1"
-            android:clipToPadding="false"
-            android:paddingVertical="8dp" />
+            android:layout_weight="1">
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/recyclerView"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:clipToPadding="false"
+                android:paddingVertical="8dp" />
+
+            <!-- 空状态：单独居中展示，不再挤在「全选」一行的状态栏里 -->
+            <TextView
+                android:id="@+id/tvBackupEmpty"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:gravity="center"
+                android:lineSpacingExtra="4dp"
+                android:paddingStart="32dp"
+                android:paddingEnd="32dp"
+                android:text="未找到模块"
+                android:textColor="@color/explore_slate_500"
+                android:textSize="14sp"
+                android:visibility="gone" />
+        </FrameLayout>
 
     </LinearLayout>
 

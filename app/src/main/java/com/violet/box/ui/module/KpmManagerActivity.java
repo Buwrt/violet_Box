@@ -1,7 +1,6 @@
 package com.violet.box.ui.module;
 
 import android.annotation.SuppressLint;
-import android.app.Activity;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
@@ -9,6 +8,8 @@ import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.LayoutInflater;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ProgressBar;
@@ -18,6 +19,8 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.Toolbar;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -49,7 +52,7 @@ import java.util.concurrent.Executors;
  * We intentionally do not pretend otherwise - the environment card says so and we offer a
  * shortcut that opens APatch for that step.
  */
-public class KpmManagerActivity extends Activity {
+public class KpmManagerActivity extends AppCompatActivity {
 
     private static final int REQ_PICK = 4711;
     private static final String APATCH_PKG = "me.bmax.apatch";
@@ -95,8 +98,10 @@ public class KpmManagerActivity extends Activity {
         envApatch = findViewById(R.id.tvKpmEnvApatch);
         envDir = findViewById(R.id.tvKpmEnvDir);
 
-        findViewById(R.id.btnKpmBack).setOnClickListener(v -> finish());
-        findViewById(R.id.btnKpmRefresh).setOnClickListener(v -> reload());
+        // 原生标题栏：返回箭头 + 「刷新」菜单，与「模块备份」页保持同一套 UI
+        Toolbar toolbar = findViewById(R.id.toolbar);
+        setSupportActionBar(toolbar);
+        toolbar.setNavigationOnClickListener(v -> finish());
         findViewById(R.id.btnKpmPick).setOnClickListener(v -> pickFile());
 
         recycler.setLayoutManager(new LinearLayoutManager(this));
@@ -104,6 +109,21 @@ public class KpmManagerActivity extends Activity {
         recycler.setAdapter(adapter);
 
         reload();
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(@NonNull Menu menu) {
+        getMenuInflater().inflate(R.menu.menu_kpm, menu);
+        return true;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
+        if (item.getItemId() == R.id.action_kpm_refresh) {
+            reload();
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
     }
 
     @Override
