@@ -1,8 +1,3 @@
 <resources>
     <string name="app_name">紫罗兰盒子</string>
-    <string name="kpm_env_collapse">收起</string>
-    <string name="kpm_env_expand">展开</string>
-    <string name="kpm_log_copy">复制日志</string>
-    <string name="kpm_log_copied">日志已复制到剪贴板</string>
-    <string name="kpm_log_copy_empty">没有可复制的日志</string>
 </resources>

@@ -241,12 +241,6 @@ public class MainActivity extends AppCompatActivity {
                             com.violet.box.ui.repo.ModuleRepoActivity.class)));
         }
         }
-        View btnKpmManager = findViewById(R.id.btnKpmManager);
-        if (btnKpmManager != null) {
-            btnKpmManager.setOnClickListener(v ->
-                    startActivity(new Intent(this,
-                            com.violet.box.ui.module.KpmManagerActivity.class)));
-        }
         View cardGithubRepo = findViewById(R.id.cardGithubRepo);
         if (cardGithubRepo != null) {
             cardGithubRepo.setOnClickListener(v -> {
