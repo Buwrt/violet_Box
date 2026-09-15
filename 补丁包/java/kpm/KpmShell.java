@@ -533,6 +533,25 @@ public final class KpmShell {
         return r.ok() ? null : "卸载失败：" + r.out;
     }
 
+    /**
+     * Deletes a single loose file (a .kpm the user dropped into Download, say).
+     *
+     * Only used as a fallback: most such files live in app-private storage and go away with a
+     * plain {@link java.io.File#delete()}. The public Download dir needs a root shell.
+     * Guards against being handed a directory or an empty path.
+     */
+    public static String deleteFile(String path) {
+        if (path == null || path.trim().isEmpty()) return "路径为空";
+        String p = path.trim();
+        if (p.endsWith("/")) return "拒绝删除目录：" + p;
+        if (!haveRoot()) return "没有 ROOT 权限，无法删除该路径";
+        Result r = exec("if [ -d '" + q(p) + "' ]; then echo ISDIR; exit 3; fi\n"
+                + "rm -f '" + q(p) + "' || exit 1\n"
+                + "exit 0", 15000);
+        if (r.out.contains("ISDIR")) return "拒绝删除目录：" + p;
+        return r.ok() ? null : "rm 失败（code=" + r.code + "）" + (r.out.isEmpty() ? "" : "：" + r.out);
+    }
+
     /** Escapes a path so it is safe inside single quotes for /system/bin/sh. */
     static String q(String s) {
         return s == null ? "" : s.replace("'", "'\"'\"'");

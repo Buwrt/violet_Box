@@ -123,6 +123,22 @@
                 android:textStyle="bold" />
 
             <TextView
+                android:id="@+id/btnKpmDeleteFile"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="4dp"
+                android:background="?attr/selectableItemBackground"
+                android:paddingStart="14dp"
+                android:paddingTop="8dp"
+                android:paddingEnd="14dp"
+                android:paddingBottom="8dp"
+                android:text="删除"
+                android:textColor="@color/ios_semantic_negative"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
+
+            <TextView
                 android:id="@+id/btnKpmUninstall"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"

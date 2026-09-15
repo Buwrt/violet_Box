@@ -27,6 +27,7 @@
 | **V6** | `v1.1.0-V6` / `V6` | 新页面 UI 统一回原生 Material 设计，抽出 `ModuleRepoAdapter`，列表补空状态与权限说明 |
 | **V7** | `v1.1.0-V7` / `V7` | 修复「我在 APatch 里嵌入了 KPM，为什么这里显示没有」——真因是 kptools repack 会重新压缩 kernel，raw 分区扫不到 `kpe` magic；改为 `dd` 导出分区后 unpack 再读 kernel |
 | **V8** | `v1.1.0-V8` / `V8` | **写入 Embedded KPM**（对标 FolkPatch）：从你自己的 boot 里刻出 kpimg 重新打补丁，把旧镜像的 superkey 字节原样 `dd` 回去，root 授权完全不变；附带 boot 镜像备份 / 恢复 |
+| **V9** | `v1.1.0-V9` / `V9` | 「可刷入的文件」卡片加**删除**按钮（删前弹路径确认，绝不接受删目录）；**运行环境**卡片首次展开、之后记忆折叠状态，点标题行重新展开，折叠时标题右侧保留一行 `ROOT · APatch` 摘要 |
 
 ### 🔙 回到任意版本
 
@@ -73,6 +74,7 @@ app/src/main/res/layout/
 | [`docs/V6_UI统一与空状态修复说明.md`](docs/V6_UI统一与空状态修复说明.md) | 新页面为什么改回原生 UI、空状态与 root 权限提示 |
 | [`docs/V7_嵌入KPM识别与备份.md`](docs/V7_嵌入KPM识别与备份.md) | 「已嵌入却显示不出来」的根因与 `kpe`  extras 链解析 |
 | [`docs/V8_嵌入KPM写入机制与功能说明.md`](docs/V8_嵌入KPM写入机制与功能说明.md) | 与 FolkPatch 的对比、superkey 字节迁移、11 道写入闸门、已知限制 |
+| [`docs/V9_删除按钮与运行环境折叠.md`](docs/V9_删除按钮与运行环境折叠.md) | 删除按钮的安全边界、运行环境折叠状态的持久化与摘要 |
 | [`docs/环境检测恢复说明_b42df36.md`](docs/环境检测恢复说明_b42df36.md) | 环境检测是怎么从 `b42df36` 捞回来的、修了哪些 bug |
 | [`docs/ROOT隐藏模块全谱系与原理手册.md`](docs/ROOT隐藏模块全谱系与原理手册.md) | 隐藏 Root 的模块原理（Zygisk / PIF / TrickyStore / SUSFS 等） |
 | [`docs/violet_Box_仓库分析报告.md`](docs/violet_Box_仓库分析报告.md) | 上游仓库的整体结构与代码分析 |

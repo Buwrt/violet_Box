@@ -46,61 +46,115 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="16dp">
+                android:paddingStart="16dp"
+                android:paddingTop="14dp"
+                android:paddingEnd="16dp"
+                android:paddingBottom="16dp">
 
-                <TextView
+                <!-- 环境卡片标题行：整行可点，用于展开 / 收起下面的检测结果。
+                     首次进来是展开的，用户收起过一次之后就一直保持收起。 -->
+                <LinearLayout
+                    android:id="@+id/rowKpmEnvToggle"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:fontFamily="sans-serif-medium"
-                    android:text="运行环境"
-                    android:textColor="@color/explore_slate_800"
-                    android:textSize="16sp" />
+                    android:background="?attr/selectableItemBackground"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
 
-                <TextView
-                    android:id="@+id/tvKpmEnvRoot"
+                    <TextView
+                        android:id="@+id/tvKpmEnvTitle"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:fontFamily="sans-serif-medium"
+                        android:text="运行环境"
+                        android:textColor="@color/explore_slate_800"
+                        android:textSize="16sp" />
+
+                    <TextView
+                        android:id="@+id/tvKpmEnvSummary"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:text=""
+                        android:textColor="@color/explore_slate_500"
+                        android:textSize="12sp"
+                        android:visibility="gone" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnKpmEnvToggle"
+                        style="@style/Widget.Material3.Button.TextButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="4dp"
+                        android:clickable="false"
+                        android:focusable="false"
+                        android:insetTop="0dp"
+                        android:insetBottom="0dp"
+                        android:minWidth="0dp"
+                        android:paddingStart="8dp"
+                        android:paddingEnd="8dp"
+                        android:text="@string/kpm_env_collapse"
+                        android:textColor="@color/ios_accent"
+                        android:textSize="13sp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/groupKpmEnvBody"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:text="ROOT：检测中…"
-                    android:textColor="@color/explore_slate_800"
-                    android:textSize="13sp" />
+                    android:orientation="vertical">
 
-                <TextView
-                    android:id="@+id/tvKpmEnvApatch"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:text="KernelPatch / APatch：检测中…"
-                    android:textColor="@color/explore_slate_800"
-                    android:textSize="13sp" />
+                    <TextView
+                        android:id="@+id/tvKpmEnvRoot"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="ROOT：检测中…"
+                        android:textColor="@color/explore_slate_800"
+                        android:textSize="13sp" />
 
-                <TextView
-                    android:id="@+id/tvKpmEnvDir"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:text="模块目录：检测中…"
-                    android:textColor="@color/explore_slate_800"
-                    android:textSize="13sp" />
+                    <TextView
+                        android:id="@+id/tvKpmEnvApatch"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="KernelPatch / APatch：检测中…"
+                        android:textColor="@color/explore_slate_800"
+                        android:textSize="13sp" />
 
-                <TextView
-                    android:id="@+id/tvKpmEnvEmbed"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:text="嵌入 boot：检测中…"
-                    android:textColor="@color/explore_slate_800"
-                    android:textSize="13sp" />
+                    <TextView
+                        android:id="@+id/tvKpmEnvDir"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="模块目录：检测中…"
+                        android:textColor="@color/explore_slate_800"
+                        android:textSize="13sp" />
 
-                <TextView
-                    android:id="@+id/tvKpmEnvHint"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    android:lineSpacingExtra="2dp"
-                    android:text="说明：「安装」= 把 .kpm 放到 /data/adb/ap/kpm/&lt;id&gt;/&lt;id&gt;.kpm，由 APatch 开机加载，随时可卸载。「嵌入」= 用 /data/adb/ap/bin/kptools 把模块写进 boot 镜像，随内核最早启动，需要和 APatch/FolkPatch 一样的重打包流程，操作前会自动备份原镜像。运行时热加载走 KernelPatch supercall，需要 superkey，第三方应用拿不到，请在 APatch 内操作。"
-                    android:textColor="@color/explore_slate_500"
-                    android:textSize="12sp" />
+                    <TextView
+                        android:id="@+id/tvKpmEnvEmbed"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="嵌入 boot：检测中…"
+                        android:textColor="@color/explore_slate_800"
+                        android:textSize="13sp" />
+
+                    <TextView
+                        android:id="@+id/tvKpmEnvHint"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:lineSpacingExtra="2dp"
+                        android:text="说明：「安装」= 把 .kpm 放到 /data/adb/ap/kpm/&lt;id&gt;/&lt;id&gt;.kpm，由 APatch 开机加载，随时可卸载。「嵌入」= 用 /data/adb/ap/bin/kptools 把模块写进 boot 镜像，随内核最早启动，需要和 APatch/FolkPatch 一样的重打包流程，操作前会自动备份原镜像。运行时热加载走 KernelPatch supercall，需要 superkey，第三方应用拿不到，请在 APatch 内操作。"
+                        android:textColor="@color/explore_slate_500"
+                        android:textSize="12sp" />
+                </LinearLayout>
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 

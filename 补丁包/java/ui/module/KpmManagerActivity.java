@@ -2,6 +2,7 @@ package com.violet.box.ui.module;
 
 import android.annotation.SuppressLint;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
@@ -59,6 +60,10 @@ public class KpmManagerActivity extends AppCompatActivity {
     private static final int REQ_PICK = 4711;
     private static final String APATCH_PKG = "me.bmax.apatch";
 
+    /** Remembers whether the user folded the 「运行环境」 card away. */
+    private static final String PREF_ENV = "kpm_manager";
+    private static final String KEY_ENV_EXPANDED = "env_expanded";
+
     private final Handler main = new Handler(Looper.getMainLooper());
     private final ExecutorService io = Executors.newSingleThreadExecutor(r -> new Thread(r, "kpm-mgr"));
 
@@ -69,6 +74,12 @@ public class KpmManagerActivity extends AppCompatActivity {
     private TextView envApatch;
     private TextView envDir;
     private TextView envEmbed;
+    private View groupEnvBody;
+    private TextView tvEnvSummary;
+    private TextView btnEnvToggle;
+    private SharedPreferences prefs;
+    /** Mirrors the persisted state so the toggle never has to touch disk mid-frame. */
+    private boolean envExpanded = true;
 
     private final List<Object> rows = new ArrayList<>();
     private KpmAdapter adapter;
@@ -120,6 +131,19 @@ public class KpmManagerActivity extends AppCompatActivity {
         envApatch = findViewById(R.id.tvKpmEnvApatch);
         envDir = findViewById(R.id.tvKpmEnvDir);
         envEmbed = findViewById(R.id.tvKpmEnvEmbed);
+        groupEnvBody = findViewById(R.id.groupKpmEnvBody);
+        tvEnvSummary = findViewById(R.id.tvKpmEnvSummary);
+        btnEnvToggle = findViewById(R.id.btnKpmEnvToggle);
+
+        // 运行环境：第一次用是展开的；用户收起过一次之后，之后每次进来都是收起的，
+        // 点标题行（或右侧「展开」）才重新展开。
+        prefs = getSharedPreferences(PREF_ENV, MODE_PRIVATE);
+        envExpanded = prefs.getBoolean(KEY_ENV_EXPANDED, true);
+        findViewById(R.id.rowKpmEnvToggle).setOnClickListener(v -> {
+            envExpanded = !envExpanded;
+            prefs.edit().putBoolean(KEY_ENV_EXPANDED, envExpanded).apply();
+            applyEnvExpanded();
+        });
 
         // 原生标题栏：返回箭头 + 「刷新」菜单，与「模块备份」页保持同一套 UI
         Toolbar toolbar = findViewById(R.id.toolbar);
@@ -131,7 +155,40 @@ public class KpmManagerActivity extends AppCompatActivity {
         adapter = new KpmAdapter();
         recycler.setAdapter(adapter);
 
+        applyEnvExpanded();
         reload();
+    }
+
+    /**
+     * Applies the collapsed state of the environment card.
+     *
+     * When folded, the raw detection lines are hidden but a one-line digest stays visible
+     * ({@code ROOT: 已获取 · APatch 115028}), so the user still gets the verdict without
+     * having to open the card every single time.
+     */
+    private void applyEnvExpanded() {
+        groupEnvBody.setVisibility(envExpanded ? View.VISIBLE : View.GONE);
+        btnEnvToggle.setText(envExpanded ? R.string.kpm_env_collapse : R.string.kpm_env_expand);
+        tvEnvSummary.setText(buildEnvSummary());
+        tvEnvSummary.setVisibility(envExpanded ? View.GONE : View.VISIBLE);
+    }
+
+    /** Short "ROOT · APatch" digest shown in the folded header. Empty until the first scan lands. */
+    private String buildEnvSummary() {
+        StringBuilder sb = new StringBuilder();
+        String root = envRoot == null ? "" : envRoot.getText().toString();
+        if (root.startsWith("ROOT：")) {
+            sb.append(root.startsWith("ROOT：已获取") ? "ROOT 已获取" : "无 ROOT");
+        }
+        String ap = envApatch == null ? "" : envApatch.getText().toString();
+        int bar = ap.indexOf('：');
+        if (bar >= 0) {
+            String tailText = ap.substring(bar + 1);
+            if (!tailText.startsWith("检测中") && !tailText.startsWith("未检测到")) {
+                sb.append(sb.length() > 0 ? " · " : "").append(tailText);
+            }
+        }
+        return sb.toString();
     }
 
     @Override
@@ -275,6 +332,8 @@ public class KpmManagerActivity extends AppCompatActivity {
                 envApatch.setText(env2.toString());
                 envDir.setText(env3.toString());
                 envEmbed.setText(env4.toString());
+                // 折叠状态下标题行的摘要依赖上面四行，所以结果落地后再刷一次
+                applyEnvExpanded();
 
                 rows.clear();
                 if (!installedRows.isEmpty()) {
@@ -727,6 +786,52 @@ public class KpmManagerActivity extends AppCompatActivity {
         });
     }
 
+    // ------------------------------------------------------- 删除待刷入文件
+
+    /**
+     * Deletes a loose .kpm that is sitting on disk waiting to be flashed.
+     *
+     * We only ever touch files we scanned ourselves (the app's own Download dir, the public
+     * Download dir), and the confirmation spells out the exact path, because this is a real
+     * file deletion with no recycle bin behind it.
+     */
+    private void confirmDeleteFile(Row row) {
+        final String target = row.info.path;
+        if (target == null) {
+            toast("删除失败：文件路径为空");
+            return;
+        }
+        new AlertDialog.Builder(this)
+                .setTitle("删除文件")
+                .setMessage("将从磁盘删除：\n\n" + target
+                        + "\n\n只删除这个 .kpm 文件，已经刷进 /data/adb/ap/kpm/ 的模块不受影响。")
+                .setNegativeButton("取消", null)
+                .setPositiveButton("删除", (d, w) -> doDeleteFile(row))
+                .show();
+    }
+
+    private void doDeleteFile(Row row) {
+        busy(true);
+        io.execute(() -> {
+            String err = deleteQuietly(new File(row.info.path));
+            main.post(() -> {
+                busy(false);
+                toast(err == null ? "已删除文件" : err);
+                reload();
+            });
+        });
+    }
+
+    /** @return null on success, otherwise a user-facing reason. */
+    private static String deleteQuietly(File f) {
+        if (!f.exists()) return "文件已经不在了";
+        // App-private dirs delete directly; anything else may need a root shell.
+        if (f.delete()) return null;
+        String err = KpmShell.deleteFile(f.getAbsolutePath());
+        if (err != null) return "删除失败：" + err;
+        return f.exists() ? "删除失败：文件仍存在" : null;
+    }
+
     // ------------------------------------------------------------------ adapter
 
     private static final int TYPE_HEADER = 0;
@@ -783,6 +888,7 @@ public class KpmManagerActivity extends AppCompatActivity {
         final TextView btnInstall;
         final TextView btnToggle;
         final TextView btnUninstall;
+        final TextView btnDeleteFile;
 
         RowHolder(@NonNull View itemView) {
             super(itemView);
@@ -795,6 +901,7 @@ public class KpmManagerActivity extends AppCompatActivity {
             btnInstall = itemView.findViewById(R.id.btnKpmInstall);
             btnToggle = itemView.findViewById(R.id.btnKpmToggle);
             btnUninstall = itemView.findViewById(R.id.btnKpmUninstall);
+            btnDeleteFile = itemView.findViewById(R.id.btnKpmDeleteFile);
         }
 
         void bind(final Row row) {
@@ -814,6 +921,8 @@ public class KpmManagerActivity extends AppCompatActivity {
                     : (info.path == null ? "" : info.path));
 
             badge.setText("KPM");
+            // 删除按钮默认收起，只有「可刷入的文件」这一类才放出来
+            btnDeleteFile.setVisibility(View.GONE);
             if (row.embedded) {
                 // 已嵌入：随内核启动，不能用文件开关启停/卸载；只能导出、或重新打包镜像移除
                 state.setText("已嵌入");
@@ -843,11 +952,16 @@ public class KpmManagerActivity extends AppCompatActivity {
                 btnToggle.setText(row.disabled ? "启用" : "禁用");
                 btnUninstall.setVisibility(View.VISIBLE);
             } else {
+                // 磁盘上待刷入的 .kpm 文件：给一个删除按钮，免得用户在 app 里刷完想清理
+                // 还得跑去找文件管理器
+                boolean deletable = row.info.path != null && row.info.path.toLowerCase().endsWith(".kpm");
                 state.setText("未刷入");
                 state.setTextColor(getResources().getColor(R.color.ios_text_secondary));
                 btnInstall.setVisibility(View.VISIBLE);
                 btnToggle.setVisibility(View.GONE);
                 btnUninstall.setVisibility(View.GONE);
+                btnDeleteFile.setVisibility(deletable ? View.VISIBLE : View.GONE);
+                btnDeleteFile.setOnClickListener(v -> confirmDeleteFile(row));
             }
 
             btnInstall.setOnClickListener(v -> {
