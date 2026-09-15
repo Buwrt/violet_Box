@@ -1,0 +1,261 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/main"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/ios_background_grouped"
+    tools:context="com.violet.box.ui.main.MainActivity">
+
+    <com.google.android.material.appbar.AppBarLayout
+        android:id="@+id/appBarLayout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/ios_background_elevated"
+        android:elevation="8dp"
+        android:translationZ="8dp"
+        app:elevation="8dp">
+
+        <com.google.android.material.appbar.MaterialToolbar
+            android:id="@+id/toolbar"
+            android:layout_width="match_parent"
+            android:layout_height="?attr/actionBarSize"
+            android:background="@color/ios_background_elevated"
+            app:menu="@menu/toolbar_menu"
+            app:popupTheme="@style/ThemeOverlay.Violet.ToolbarPopup"
+            app:title="@string/app_name"
+            app:titleTextAppearance="@style/Widget.Violet.ToolbarTitle"
+            app:titleTextColor="@color/ios_text_primary" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="0.5dp"
+            android:background="@color/ios_separator" />
+
+    </com.google.android.material.appbar.AppBarLayout>
+
+    <View
+        android:id="@+id/overflowMenuScrim"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_marginTop="?attr/actionBarSize"
+        android:background="#78000000"
+        android:clickable="true"
+        android:focusable="true"
+        android:visibility="gone" />
+
+    <FrameLayout
+        android:id="@+id/contentHome"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior">
+
+            <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+                android:id="@+id/swipeSafetyRefresh"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="vertical"
+                android:paddingHorizontal="@dimen/ios_screen_edge"
+                android:paddingTop="8dp">
+
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardSafetyStatus"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp"
+                app:cardBackgroundColor="@color/ios_glass_surface"
+                app:cardCornerRadius="@dimen/ios_card_corner"
+                app:cardElevation="0dp"
+                app:strokeColor="@color/ios_glass_stroke"
+                app:strokeWidth="1dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="@dimen/ios_card_padding"
+                    android:paddingTop="22dp"
+                    android:paddingBottom="22dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <ImageView
+                            android:id="@+id/ivSafetyShizukuIcon"
+                            android:layout_width="34dp"
+                            android:layout_height="34dp"
+                            android:src="@drawable/ic_ms_security"
+                            app:tint="@color/ios_text_secondary" />
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="12dp"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:id="@+id/tvSafetyStatus"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Shizuku：检测中..."
+                                android:textColor="@color/ios_text_primary"
+                                android:textSize="16sp"
+                                android:fontFamily="sans-serif-medium" />
+
+                            <TextView
+                                android:id="@+id/tvSafetyDetail"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:text="通过限制指定应用的加速度传感器，阻止摇一摇广告的触发与跳转"
+                                android:textColor="@color/ios_text_secondary"
+                                android:textSize="12sp" />
+
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="12dp"
+                            android:gravity="end"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:id="@+id/tvProtectCount"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="0"
+                                android:textColor="@color/ios_text_primary"
+                                android:textSize="26sp"
+                                android:fontFamily="sans-serif-medium" />
+                        </LinearLayout>
+                    </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/tvSafetyCmdState"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:textColor="@color/ios_text_secondary"
+                        android:textSize="12sp"
+                        android:visibility="gone" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <EditText
+                android:id="@+id/etSafetySearch"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="4dp"
+                android:background="@drawable/bg_search_box"
+                android:hint="搜索应用名称或包名"
+                android:imeOptions="actionSearch"
+                android:inputType="text"
+                android:maxLines="1"
+                android:paddingHorizontal="14dp"
+                android:paddingVertical="10dp"
+                android:textColor="@color/ios_text_primary"
+                android:textColorHint="@color/ios_text_secondary"
+                android:textSize="14sp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="4dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/chipShowSystem"
+                    style="@style/Widget.Material3.Chip.Filter"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:checkable="true"
+                    android:text="系统应用" />
+
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/chipRestoreAll"
+                    style="@style/Widget.Material3.Chip.Assist"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:text="全部恢复" />
+            </LinearLayout>
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/rvSafetyApps"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:clipToPadding="false"
+                android:overScrollMode="never"
+                android:paddingBottom="104dp" />
+
+            <!-- 环境检测（默认安全页）：由 SafetyPageController 在 DETECTION 模式下填充。
+                 负边距 = -ios_screen_edge(16dp)，抵消父布局的左右内边距，让检测页的
+                 #F5F5F5 底色满幅铺开，内边距改由 fragment_detect 自身的 16dp 提供。 -->
+            <androidx.core.widget.NestedScrollView
+                android:id="@+id/detectScrollView"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:visibility="gone"
+                android:clipToPadding="false"
+                android:overScrollMode="never"
+                android:paddingBottom="104dp"
+                android:layout_marginStart="-16dp"
+                android:layout_marginEnd="-16dp">
+
+                <LinearLayout
+                    android:id="@+id/layoutDetectHost"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical" />
+
+            </androidx.core.widget.NestedScrollView>
+
+        </LinearLayout>
+            </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+    </FrameLayout>
+
+    <!-- “设备”导航：使用 DeviceFragment 加载 fragment_device.xml -->
+    <FrameLayout
+        android:id="@+id/contentDevice"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior">
+
+        <androidx.fragment.app.FragmentContainerView
+            android:id="@+id/device_fragment_container"
+            android:name="com.violet.box.ui.device.DeviceFragment"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+    </FrameLayout>
+
+    <include
+        android:id="@+id/fragmentExplorePlaceholder"
+        layout="@layout/fragment_explore_placeholder"
+        android:layout_marginTop="?attr/actionBarSize"
+        android:visibility="gone"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior" />
+
+    <include
+        android:id="@+id/fragmentSettingsPlaceholder"
+        layout="@layout/fragment_settings_placeholder"
+        android:layout_marginTop="?attr/actionBarSize"
+        android:visibility="gone"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior">
+    </include>
+
+    <!-- Compose 底部悬浮导航被移到 MainActivity.java 中，用 AndroidView 渲染整个 activity_main -->
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

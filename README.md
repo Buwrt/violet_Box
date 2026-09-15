@@ -15,18 +15,43 @@
 
 ## 🍴 关于本仓库（Fork 说明）
 
-本仓库 fork 自 [Smart-Paocai/violet_Box](https://github.com/Smart-Paocai/violet_Box)，**保留完整上游提交历史**，同样遵循 **GPL-3.0**。在上游基础上做了四个版本的改动：
+本仓库 fork 自 [Smart-Paocai/violet_Box](https://github.com/Smart-Paocai/violet_Box)，**保留完整上游提交历史**，同样遵循 **GPL-3.0**。在上游基础上做了八个版本的改动，**每个版本一次提交、一个标签，可随时回到任意版本**：
 
-| 版本 | 改动 |
-| --- | --- |
-| **V1** | 新增「模块下载中心」：内置 40 个 KPM / ZIP 模块，点条目可选版本，不选则默认最新版 |
-| **V2** | 修掉「无法开始下载」——真因是在线程池里创建 `AlertDialog`，抛 `Can't create handler inside thread`；改为 `main.post()` 回主线程后再建对话框 |
-| **V3** | 从提交 `b42df36` 完整捞回被删除的**环境检测**功能（`RootDetector` / `HardcodedSignals` / `AdvancedRuntimeDetector` / `DetectFragment` / `fragment_detect.xml`）。安全页**默认**显示环境检测，「使用摇一摇防护」作为设置里的开关，关闭时回落到环境检测。检测页恢复 b42df36 原版紫色 UI |
-| **V4** | 模块目录 **40 → 178 个**（ZIP 170 + KPM 8，64 个分类，全部来自开源仓库），新增**实时搜索**：支持按名称 / 作者 / `owner/repo` 仓库全名 / 分类 / 说明搜索，空格分隔多关键词 AND，带结果计数与清空按钮 |
+| 版本 | 标签 | 改动 |
+| --- | --- | --- |
+| **V1** | — | 新增「模块下载中心」：内置 40 个 KPM / ZIP 模块，点条目可选版本，不选则默认最新版 |
+| **V2** | — | 修掉「无法开始下载」——真因是在线程池里创建 `AlertDialog`，抛 `Can't create handler inside thread`；改为 `main.post()` 回主线程后再建对话框 |
+| **V3** | — | 从提交 `b42df36` 完整捞回被删除的**环境检测**功能（`RootDetector` / `HardcodedSignals` / `AdvancedRuntimeDetector` / `DetectFragment` / `fragment_detect.xml`）。安全页**默认**显示环境检测，「使用摇一摇防护」作为设置里的开关，关闭时回落到环境检测。检测页恢复 b42df36 原版紫色 UI |
+| **V4** | `v1.1.0-V4` | 模块目录 **40 → 178 个**（ZIP 170 + KPM 8，64 个分类，全部来自开源仓库），新增**实时搜索**：支持按名称 / 作者 / `owner/repo` 仓库全名 / 分类 / 说明搜索，空格分隔多关键词 AND，带结果计数与清空按钮 |
+| **V5** | `v1.1.0-V5` / `V5` | **KPM 刷写**（玩机 → 实用功能）：解析 ELF 的 `.kpm.info` 段列出名称 / 版本 / 作者，支持模块目录安装与 boot 内嵌两类来源；模块备份新增「内核模块」类型 |
+| **V6** | `v1.1.0-V6` / `V6` | 新页面 UI 统一回原生 Material 设计，抽出 `ModuleRepoAdapter`，列表补空状态与权限说明 |
+| **V7** | `v1.1.0-V7` / `V7` | 修复「我在 APatch 里嵌入了 KPM，为什么这里显示没有」——真因是 kptools repack 会重新压缩 kernel，raw 分区扫不到 `kpe` magic；改为 `dd` 导出分区后 unpack 再读 kernel |
+| **V8** | `v1.1.0-V8` / `V8` | **写入 Embedded KPM**（对标 FolkPatch）：从你自己的 boot 里刻出 kpimg 重新打补丁，把旧镜像的 superkey 字节原样 `dd` 回去，root 授权完全不变；附带 boot 镜像备份 / 恢复 |
+
+### 🔙 回到任意版本
+
+```bash
+git clone https://github.com/Buwrt/violet_Box.git
+cd violet_Box
+git tag -l                     # v1.1.0-V4 … v1.1.0-V8（同时存在简写 V5…V8）
+git checkout v1.1.0-V6         # 回到 V6 的源码
+# 或 git checkout V6
+```
+
+每个标签在 [Releases](https://github.com/Buwrt/violet_Box/releases) 里都挂了对应的
+`VioletBox-Vx-release.apk` / `VioletBox-Vx-debug.apk`，不想编译就直接下当年那个包。
 
 ### 新增文件一览
 
 ```
+app/src/main/java/com/violet/box/kpm/            # KPM 内核模块（V5 起）
+    KpmInfo.java        # .kpm.info 段解析（name/version/author/license/description）
+    KpmShell.java       # shell 通道、boot 分区枚举、APatch 目录与 preset 探测
+    KpmEmbedded.java    # V7  解析 kptools patch 布局，读出「已嵌入」的 KPM
+    KpmPreset.java      # V8  在打过补丁的 kernel 里定位 kpimg 并读出 patch preset
+    KpmEmbedTool.java   # V8  嵌入写入流水线（11 道闸门 + 自动备份 + 端到端校验）
+app/src/main/java/com/violet/box/ui/module/
+    KpmManagerActivity.java     # V5  KPM 刷写页（列表 / 安装 / 嵌入 / 移除 / 日志）
 app/src/main/java/com/violet/box/ui/repo/          # 模块下载中心
     ModuleRepoActivity.java  ModuleRepoAdapter.java  ModuleEntry.java  RepoClient.java
 app/src/main/java/com/violet/box/ui/detect/        # 环境检测 UI（b42df36 捞回）
@@ -44,14 +69,20 @@ app/src/main/res/layout/
 | 文件 | 内容 |
 | --- | --- |
 | [`docs/V4_模块目录与搜索功能说明.md`](docs/V4_模块目录与搜索功能说明.md) | 178 个模块的来源、收录与排除规则、KPM 生态说明、搜索用法、**完整清单** |
+| [`docs/V5_KPM刷写机制与功能说明.md`](docs/V5_KPM刷写机制与功能说明.md) | KPM 刷写的三条路线（嵌入 / 加载 / 安装）、ELF `.kpm.info` 结构、V5 做了什么 |
+| [`docs/V6_UI统一与空状态修复说明.md`](docs/V6_UI统一与空状态修复说明.md) | 新页面为什么改回原生 UI、空状态与 root 权限提示 |
+| [`docs/V7_嵌入KPM识别与备份.md`](docs/V7_嵌入KPM识别与备份.md) | 「已嵌入却显示不出来」的根因与 `kpe`  extras 链解析 |
+| [`docs/V8_嵌入KPM写入机制与功能说明.md`](docs/V8_嵌入KPM写入机制与功能说明.md) | 与 FolkPatch 的对比、superkey 字节迁移、11 道写入闸门、已知限制 |
 | [`docs/环境检测恢复说明_b42df36.md`](docs/环境检测恢复说明_b42df36.md) | 环境检测是怎么从 `b42df36` 捞回来的、修了哪些 bug |
 | [`docs/ROOT隐藏模块全谱系与原理手册.md`](docs/ROOT隐藏模块全谱系与原理手册.md) | 隐藏 Root 的模块原理（Zygisk / PIF / TrickyStore / SUSFS 等） |
 | [`docs/violet_Box_仓库分析报告.md`](docs/violet_Box_仓库分析报告.md) | 上游仓库的整体结构与代码分析 |
 
-### ⚠️ 两点提醒
+### ⚠️ 使用提醒
 
+- **KPM 嵌入是自担风险的操作**：`KpmEmbedTool` 会先把当前 boot 备份到 `内部存储/Download/VioletBox/`，默认按钮是「仅生成」（不写分区），写分区前会经过 11 道校验。仍然请务必确认备份存在再动手。
 - **签名**：`app/build.gradle.kts` 里 release 构建改用 debug 密钥签名（因为没有原作者的 keystore），所以打出的包**不能覆盖安装官方版**，装之前需先卸载旧版。有正式 keystore 的话改回即可。
 - **模块目录可远程更新**：`ModuleRepoActivity` 里的 `CATALOG_URL` 指向仓库 raw 文件，维护一份 JSON 就能不升级 APK 更新目录；拉不到时自动回退内置清单。
+- **`补丁包/`**：独立交付的增量包形态（含 `module_repo.json` 与变更过的源码副本），用于不想整体 checkout 的场景；主源码仍是 `app/`。
 
 ---
 
@@ -69,6 +100,7 @@ app/src/main/res/layout/
 | 🎭 全局机型伪装 | resetprop 修改机型与构建指纹 |
 | ☁️ Payload 云提取 | 在线下载 OTA 固件并提取指定分区镜像 |
 | 🧩 紫罗兰插件 | 内核伪装 / TrickyStore扩展 / 隐藏应用列表配置 |
+| 🔧 KPM 刷写 | 列出设备上的内核模块（含 boot 内嵌），支持安装到模块目录或直接嵌入 boot 镜像 |
 
 ## 🛡️ 摇一摇广告防护（免 Root）
 
@@ -87,7 +119,7 @@ app/src/main/res/layout/
 
 1. 克隆本项目到本地：
    ```bash
-   git clone https://github.com/Smart-Paocai/violet_Box.git
+   git clone https://github.com/Buwrt/violet_Box.git
    ```
 2. 使用 Android Studio 打开项目。
 3. 等待 Gradle 同步完成。

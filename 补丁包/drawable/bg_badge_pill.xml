@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 徽章底：实色胶囊，颜色由 backgroundTint 决定（ZIP=紫罗兰 / KPM=青） -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/ios_accent" />
+    <corners android:radius="4dp" />
+</shape>

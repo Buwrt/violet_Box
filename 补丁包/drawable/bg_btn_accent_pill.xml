@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 主操作按钮：实心圆角（刷入 / 下载最新） -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/ios_accent" />
+    <corners android:radius="20dp" />
+</shape>

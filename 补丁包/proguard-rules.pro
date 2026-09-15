@@ -1,0 +1,37 @@
+# Add project specific ProGuard rules here.
+# You can control the set of applied configuration files using the
+# proguardFiles setting in build.gradle.
+#
+# For more details, see
+#   http://developer.android.com/guide/developing/tools/proguard.html
+
+# 保留行号信息，配合每次发版归档的 mapping.txt 还原用户反馈的崩溃堆栈
+-keepattributes SourceFile,LineNumberTable
+-renamesourcefileattribute SourceFile
+
+# 工具栏溢出菜单通过反射读取 PopupMenu.mPopup 调用 setVerticalOffset 调整弹出位置，
+# 保留 appcompat 菜单内部类避免 R8 重命名后反射失效（MainActivity.applyPopupMenuOffsetCompat）
+-keep class androidx.appcompat.view.menu.** { *; }
+
+# 安全页 Shizuku UserService：服务类由 Shizuku 服务端按类名实例化，AIDL 接口跨进程
+-keep class com.violet.box.ui.safety.ShellService { *; }
+-keep class com.violet.box.ui.safety.IShellService { *; }
+-keep class com.violet.box.ui.safety.IShellService$* { *; }
+
+# If your project uses WebView with JS, uncomment the following
+# and specify the fully qualified class name to the JavaScript interface
+# class:
+#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
+#   public *;
+#}
+
+# 环境检测（从 b42df36 捞回）：保持类名与成员不变，使发布包能与上游源码逐一对照，
+# 也避免 R8 把 RootDetector / RootBeer 竖向合并后难以定位问题
+-keep class com.violet.box.data.detector.** { *; }
+-keep class com.violet.box.ui.detect.** { *; }
+-keep class com.scottyab.rootbeer.** { *; }
+
+# KPM 刷写：ELF 解析器依赖 .kpm.info 段名常量与字段顺序，且 KpmShell 里的 shell 脚本
+# 以字符串形式保存，被重命名/合并后无法排查
+-keep class com.violet.box.kpm.** { *; }
+-keep class com.violet.box.ui.module.KpmManagerActivity { *; }

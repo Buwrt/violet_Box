@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- 获取读取应用列表权限 -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" tools:ignore="QueryAllPackagesPermission" />
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <application
+        android:name="com.violet.box.VioletApplication"
+        android:allowBackup="true"        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.紫罗兰盒子">
+        <activity
+            android:name=".ui.main.MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <activity
+            android:name=".ui.selinux.SelinuxManagerActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.partition.PartitionManagerActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.font.FontLibraryBackupActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.module.ModuleManagerActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.module.ModuleBackupActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.appmanager.AppManagerActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.payload.PayloadActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.plugin.VioletPluginActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.plugin.TrickyStoreConfigActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.plugin.TrickyStoreAppListActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.plugin.TrickyStoreSecurityPatchActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.plugin.TrickyStoreHashActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.plugin.HiddenAppListConfigActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.plugin.SusfsConfigActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.plugin.KernelDisguiseActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.plugin.GlobalDeviceSpoofActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.plugin.DeviceIdModifyActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.about.AboutActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.repo.ModuleRepoActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.module.KpmManagerActivity"
+            android:exported="false" />
+
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
+        <provider
+            android:name="rikka.shizuku.ShizukuProvider"
+            android:authorities="${applicationId}.shizuku"
+            android:multiprocess="false"
+            android:enabled="true"
+            android:exported="true"
+            android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
+
+        <receiver
+            android:name=".receiver.BootCompletedReceiver"
+            android:enabled="true"
+            android:exported="false"
+            android:directBootAware="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+    </application>
+
+</manifest>

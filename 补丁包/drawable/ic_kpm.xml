@@ -1,0 +1,14 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24"
+    android:tint="?attr/colorControlNormal">
+    <!-- 内核模块：芯片外框 + 内部内核方块 + 四向引脚 -->
+    <path
+        android:fillColor="@android:color/white"
+        android:pathData="M9,9L9,4h6v5L9,9zM9,9L4,9v6h5L9,9zM15,9v5h5L20,9h-5zM15,15v5h-6v-5h6z" />
+    <path
+        android:fillColor="@android:color/white"
+        android:pathData="M11,11h2v2h-2z" />
+</vector>
