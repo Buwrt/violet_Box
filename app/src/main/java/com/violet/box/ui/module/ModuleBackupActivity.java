@@ -25,6 +25,9 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.google.android.material.chip.ChipGroup;
 import com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton;
 import com.violet.box.R;
+import com.violet.box.kpm.KpmEmbedTool;
+import com.violet.box.kpm.KpmInfo;
+import com.violet.box.kpm.KpmShell;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -48,6 +51,9 @@ public class ModuleBackupActivity extends AppCompatActivity {
     private final List<ModuleItem> moduleList = new ArrayList<>();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
+    /** 0 = 系统模块（/data/adb/modules，ZIP），1 = 内核模块（/data/adb/ap/kpm，KPM）。 */
+    private int backupMode = 0;
+
     private static class ModuleItem {
         String id;
         String name;
@@ -56,6 +62,8 @@ public class ModuleBackupActivity extends AppCompatActivity {
         String description;
         String dir;
         boolean isSelected = false;
+        /** True when this row is a single .kpm file rather than a module directory. */
+        boolean isKpm = false;
     }
 
     @Override
@@ -87,7 +95,21 @@ public class ModuleBackupActivity extends AppCompatActivity {
 
         fabBackup.setOnClickListener(v -> startBackupProcess());
 
+        ChipGroup typeGroup = findViewById(R.id.chipGroupBackupType);
+        if (typeGroup != null) {
+            typeGroup.setOnCheckedChangeListener((group, checkedId) -> {
+                int next = (checkedId == R.id.chipBackupKpm) ? 1 : 0;
+                if (next == backupMode) return;
+                backupMode = next;
+                loadModules();
+            });
+        }
+
         loadModules();
+    }
+
+    private boolean isKpmMode() {
+        return backupMode == 1;
     }
 
     private void updateFabState() {
@@ -104,6 +126,10 @@ public class ModuleBackupActivity extends AppCompatActivity {
     }
 
     private void loadModules() {
+        if (isKpmMode()) {
+            loadKpmModules();
+            return;
+        }
         tvStatus.setText("正在扫描模块...");
         fabBackup.setVisibility(View.GONE);
         new Thread(() -> {
@@ -157,6 +183,114 @@ public class ModuleBackupActivity extends AppCompatActivity {
         }).start();
     }
 
+    /**
+     * 内核模块（KPM）扫描。
+     *
+     * APatch 的持久化安装布局是 /data/adb/ap/kpm/&lt;id&gt;/&lt;id&gt;.kpm，此外社区很多 README 让把
+     * KPM 直接丢在 /data/adb/kpm/ 下，两个目录都扫一遍。
+     */
+    private void loadKpmModules() {
+        tvStatus.setText("正在扫描内核模块...");
+        fabBackup.setVisibility(View.GONE);
+        new Thread(() -> {
+            List<ModuleItem> list = new ArrayList<>();
+            try {
+                for (KpmShell.Installed in : KpmShell.listInstalled()) {
+                    KpmInfo info = KpmShell.readInfo(in.kpmPath(), in.id);
+                    ModuleItem item = new ModuleItem();
+                    item.isKpm = true;
+                    item.dir = in.kpmPath();
+                    item.id = info.id();
+                    item.name = info.displayName() + (in.disabled ? "（已禁用）" : "");
+                    item.version = info.version == null ? "" : info.version;
+                    item.author = info.author == null ? "" : info.author;
+                    item.description = info.description == null ? "" : info.description;
+                    list.add(item);
+                }
+                // 兼容社区目录：/data/adb/kpm/*.kpm（不由 APatch 管理，没有启用/禁用标记）
+                KpmShell.Result r = KpmShell.exec(
+                        "for f in '" + KpmShell.KPM_LEGACY_DIR + "'*.kpm; do "
+                                + "[ -f \"$f\" ] && echo \"$f\"; done 2>/dev/null");
+                for (String line : r.out.split("\n")) {
+                    String p = line.trim();
+                    if (p.isEmpty()) continue;
+                    boolean dup = false;
+                    for (ModuleItem e : list) {
+                        if (e.dir.equals(p)) {
+                            dup = true;
+                            break;
+                        }
+                    }
+                    if (dup) continue;
+                    String base = p.substring(p.lastIndexOf('/') + 1);
+                    String rawId = base.endsWith(".kpm") ? base.substring(0, base.length() - 4) : base;
+                    KpmInfo info = KpmShell.readInfo(p, rawId);
+                    ModuleItem item = new ModuleItem();
+                    item.isKpm = true;
+                    item.dir = p;
+                    item.id = info.id();
+                    item.name = info.displayName();
+                    item.version = info.version == null ? "" : info.version;
+                    item.author = info.author == null ? "" : info.author;
+                    item.description = info.description == null ? "" : info.description;
+                    list.add(item);
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+
+            // Embed 路线：APatch「已嵌入」的 KPM 在 boot/init_boot 镜像里，没有独立文件。
+            //
+            // V8 起改成和 APatch/FolkPatch 一致的取法：dump 分区 -> kptools unpack -> 读解包出来的
+            // kernel 里的 kpe 头链，payload ELF 原样抠出来。兜底才用直接流扫原始分区。
+            List<KpmInfo> embedded = new ArrayList<>();
+            try {
+                KpmEmbedTool.Inspect ins = KpmEmbedTool.inspect(new File(getCacheDir(), "kpm_embedded"));
+                if (ins.ok) {
+                    embedded.addAll(ins.kpms);
+                } else {
+                    KpmShell.BootScan bs =
+                            KpmShell.scanEmbeddedBoot(new File(getCacheDir(), "kpm_embedded"));
+                    if (bs != null) embedded.addAll(bs.items);
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            for (KpmInfo info : embedded) {
+                boolean dup = false;
+                for (ModuleItem e : list) {
+                    if (e.id.equals(info.id())) {
+                        dup = true;
+                        break;
+                    }
+                }
+                if (dup) continue;
+                ModuleItem item = new ModuleItem();
+                item.isKpm = true;
+                item.dir = info.path; // 抠出的可读副本
+                item.id = info.id();
+                item.name = info.displayName() + "（已嵌入）";
+                item.version = info.version == null ? "" : info.version;
+                item.author = info.author == null ? "" : info.author;
+                item.description = info.description == null ? "" : info.description;
+                list.add(item);
+            }
+
+            mainHandler.post(() -> {
+                moduleList.clear();
+                moduleList.addAll(list);
+                adapter.notifyDataSetChanged();
+                boolean empty = list.isEmpty();
+                tvStatus.setText(empty ? "未找到内核模块" : "共找到 " + list.size() + " 个内核模块");
+                tvBackupEmpty.setVisibility(empty ? View.VISIBLE : View.GONE);
+                // 空列表 ≠ ROOT 失败：环境正常但设备上确实没有 KPM 时，把话说清楚
+                tvBackupEmpty.setText("还没有可备份的内核模块\n\nROOT 正常，但没有找到已刷入或已嵌入的 KPM。\n已刷入的看 /data/adb/ap/kpm/，已嵌入的看 boot 镜像。\n先用 APatch / KernelPatch 之类的管理器刷入或嵌入，之后即可在这里备份。");
+                cbSelectAll.setChecked(false);
+                updateFabState();
+            });
+        }).start();
+    }
+
     private void startBackupProcess() {
         List<ModuleItem> selected = new ArrayList<>();
         for (ModuleItem item : moduleList) {
@@ -171,7 +305,8 @@ public class ModuleBackupActivity extends AppCompatActivity {
         dialog.show();
 
         new Thread(() -> {
-            String backupDir = "/storage/emulated/0/Magisk模块备份";
+            String backupDir = "/storage/emulated/0/Magisk模块备份"
+                    + (isKpmMode() ? "/内核模块" : "");
             try {
                 new ProcessBuilder("su", "-c", "mkdir -p \"" + backupDir + "\"").start().waitFor();
             } catch (Exception ignored) {}
@@ -185,7 +320,9 @@ public class ModuleBackupActivity extends AppCompatActivity {
                 final int current = i + 1;
                 mainHandler.post(() -> dialog.setMessage("正在备份 (" + current + "/" + selected.size() + ")\n" + item.name));
 
-                String error = doBackupModule(item.dir, backupDir, item.name, item.version);
+                String error = item.isKpm
+                        ? doBackupKpm(item, backupDir)
+                        : doBackupModule(item.dir, backupDir, item.name, item.version);
                 if (error == null) {
                     success++;
                 } else {
@@ -346,6 +483,50 @@ public class ModuleBackupActivity extends AppCompatActivity {
      * 备份单个 KPM。KPM 是单独一个 ELF 文件，没有 module.prop 也没有目录结构，
      * 所以打成一个只含 &lt;id&gt;.kpm 的 zip，恢复时解压出来直接可用。
      */
+    private String doBackupKpm(ModuleItem item, String backupDir) {
+        String safeName = item.name != null ? item.name.replaceAll("[\\\\/:*?\"<>| ]", "_") : "unknown";
+        String safeVersion = item.version != null ? item.version.replaceAll("[\\\\/:*?\"<>| ]", "_") : "unknown";
+        String backupPath = backupDir + "/" + safeName + "_v" + safeVersion + ".zip";
+
+        File src = new File(item.dir);
+        File readable = src;
+        String scratch = null;
+        if (!src.canRead()) {
+            // 在 /data/adb 下，应用自身读不到，先让 root 复制到可读的临时目录
+            scratch = KpmShell.exposeForRead(item.dir, item.id);
+            if (scratch == null) return "无法读取文件：" + item.dir;
+            readable = new File(scratch);
+        }
+
+        File tempZip = new File(getCacheDir(), "kpm_backup_" + System.currentTimeMillis() + ".zip");
+        try {
+            zipSingleFile(readable, tempZip, item.id + ".kpm");
+        } catch (Exception e) {
+            return "打包失败：" + e.getMessage();
+        }
+
+        String moveScript = "mv \"" + tempZip.getAbsolutePath() + "\" \"" + backupPath + "\"\n"
+                + "res=$?\n"
+                + (scratch != null ? "rm -f \"" + scratch + "\"\n" : "")
+                + "exit $res";
+        try {
+            Process mvProc = new ProcessBuilder("su", "-c", moveScript).redirectErrorStream(true).start();
+            BufferedReader mvReader = new BufferedReader(new InputStreamReader(mvProc.getInputStream()));
+            StringBuilder mvLog = new StringBuilder();
+            String mvLine;
+            while ((mvLine = mvReader.readLine()) != null) {
+                mvLog.append(mvLine).append("\n");
+            }
+            mvProc.waitFor();
+            if (mvProc.exitValue() != 0) {
+                return "移动备份文件失败:\n" + mvLog.toString().trim();
+            }
+        } catch (Exception e) {
+            return e.getMessage();
+        }
+        return null;
+    }
+
     private void zipSingleFile(File src, File zipFile, String entryName) throws IOException {
         try (FileOutputStream fos = new FileOutputStream(zipFile);
              ZipOutputStream zos = new ZipOutputStream(fos);
