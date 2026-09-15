@@ -60,7 +60,8 @@ import java.util.concurrent.Executors;
  */
 public class KpmManagerActivity extends AppCompatActivity {
 
-    private static final int REQ_PICK = 4711;
+    /** File picker, registered against the lifecycle so it survives configuration changes. */
+    private androidx.activity.result.ActivityResultLauncher<String> pickLauncher;
     private static final String APATCH_PKG = "me.bmax.apatch";
 
     /** Remembers whether the user folded the 「运行环境」 card away. */
@@ -167,6 +168,10 @@ public class KpmManagerActivity extends AppCompatActivity {
         setSupportActionBar(toolbar);
         toolbar.setNavigationOnClickListener(v -> finish());
         findViewById(R.id.btnKpmPick).setOnClickListener(v -> pickFile());
+
+        pickLauncher = registerForActivityResult(
+                new androidx.activity.result.contract.ActivityResultContracts.GetContent(),
+                uri -> onPicked(uri));
 
         recycler.setLayoutManager(new LinearLayoutManager(this));
         adapter = new KpmAdapter();
@@ -443,39 +448,48 @@ public class KpmManagerActivity extends AppCompatActivity {
 
     // ------------------------------------------------------------------ actions
 
+    /**
+     * Uses the Activity Result API rather than startActivityForResult: the callback is tied to the
+     * lifecycle, so it still fires after a configuration change or a process death - the classic
+     * reason a file picker "does nothing" after you pick something.
+     */
     private void pickFile() {
         try {
-            Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-            i.addCategory(Intent.CATEGORY_OPENABLE);
-            i.setType("*/*");
-            startActivityForResult(Intent.createChooser(i, "选择 .kpm 文件"), REQ_PICK);
+            pickLauncher.launch("*/*");
         } catch (Exception e) {
-            toast("无法打开文件选择器");
+            toast("无法打开文件选择器：" + e.getMessage());
         }
     }
 
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode != REQ_PICK || resultCode != RESULT_OK || data == null
-                || data.getData() == null) {
-            return;
-        }
+    /** Reads the picked file off the main thread, then asks how the user wants it applied. */
+    private void onPicked(@Nullable Uri uri) {
+        if (uri == null) return;            // user backed out - stay silent
         busy(true);
-        final Uri uri = data.getData();
         io.execute(() -> {
             File tmp = new File(getCacheDir(), "kpm_pick.kpm");
-            try (InputStream in = getContentResolver().openInputStream(uri);
-                 FileOutputStream out = new FileOutputStream(tmp)) {
-                if (in == null) throw new java.io.IOException("openInputStream 返回 null");
-                byte[] buf = new byte[8192];
-                int n;
-                while ((n = in.read(buf)) >= 0) out.write(buf, 0, n);
+            try {
+                InputStream in = getContentResolver().openInputStream(uri);
+                if (in == null) throw new java.io.IOException("无法读取所选文件（没有访问权限）");
+                long copied;
+                try (InputStream src = in; FileOutputStream out = new FileOutputStream(tmp)) {
+                    byte[] buf = new byte[8192];
+                    int n;
+                    copied = 0;
+                    while ((n = src.read(buf)) >= 0) {
+                        out.write(buf, 0, n);
+                        copied += n;
+                    }
+                }
+                if (copied <= 0) throw new java.io.IOException("读到的是空文件");
             } catch (Exception e) {
-                busy(false);
-                toast("读取文件失败：" + e.getMessage());
+                String m = e.getMessage() == null ? e.toString() : e.getMessage();
+                main.post(() -> {
+                    busy(false);
+                    toast("读取文件失败：" + m);
+                });
                 return;
             }
+
             KpmInfo info = KpmInfo.read(tmp);
             // The installer re-reads the file from its source path, so keep this copy around
             // (the cache dir is cleaned up by the system/OS eventually).
