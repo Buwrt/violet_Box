@@ -1,7 +1,9 @@
 package com.violet.box.kpm;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -88,6 +90,8 @@ public final class KpmEmbedTool {
         public String workDir = WORK;
         /** null when no KernelPatch patch was found. */
         public KpmPreset.Info preset;
+        /** Size of the kpimg blob carved out of the image into {@code workDir/kpimg}. */
+        public long kpimgSize;
         public List<Extra> extras = new ArrayList<>();
         /** Carved KPM payloads (one file per embedded KPM), ready for export/backup. */
         public List<KpmInfo> kpms = new ArrayList<>();
@@ -182,12 +186,28 @@ public final class KpmEmbedTool {
             if (KpmShell.fileSize(WORK + "/kernel") <= 0) continue;
 
             // Is this partition actually KernelPatch patched? Same check kptools itself does.
+            // We carve the kpimg blob out at the same time: kptools -p needs it via -k, and the
+            // only trustworthy source is the user's own image (a shipped copy could mismatch the
+            // running KernelPatch version). Getting this wrong is silent - kptools simply exits
+            // non-zero later on, which is exactly how "重新打补丁失败" used to happen.
+            //
+            // WORK is root-owned, so carve into the app's own cache dir first and push it across
+            // with writePrivileged(); that is the same channel the staged .kpm files use.
+            File carved = new File(outDir, "kpimg.carved");
+            deleteQuietly(carved);
             InputStream in = KpmShell.openRead(WORK + "/kernel");
             if (in != null) {
+                FileOutputStream ks = null;
                 try {
-                    st.preset = KpmPreset.scan(in, null);
+                    ks = new FileOutputStream(carved);
+                } catch (Exception e) {
+                    st.log.append("# 无法写入 kpimg：").append(e.getMessage()).append('\n');
+                }
+                try {
+                    st.preset = KpmPreset.scan(in, ks);
                 } catch (Exception ignored) {
                 } finally {
+                    close(ks);
                     close(in);
                 }
             }
@@ -195,6 +215,23 @@ public final class KpmEmbedTool {
                 st.log.append("# ").append(dev).append(" 没有 KernelPatch 补丁，换下一个\n");
                 continue;
             }
+            if (carved.length() <= 0) {
+                st.log.append("# ").append(dev).append(" 的 kpimg 提取失败（0 字节），换下一个\n");
+                continue;
+            }
+            String cpErr = KpmShell.writePrivileged(carved, WORK + "/kpimg");
+            deleteQuietly(carved);
+            if (cpErr != null) {
+                st.log.append("# 暂存 kpimg 失败：").append(cpErr).append('\n');
+                continue;
+            }
+            long kpimgLen = KpmShell.fileSize(WORK + "/kpimg");
+            if (kpimgLen <= 0) {
+                st.log.append("# ").append(dev).append(" 的 kpimg 落盘后为 0 字节，换下一个\n");
+                continue;
+            }
+            st.kpimgSize = kpimgLen;
+            st.log.append("# 已提取 kpimg：").append(kpimgLen).append(" 字节\n");
 
             st.ok = true;
             st.device = dev;
@@ -356,6 +393,15 @@ public final class KpmEmbedTool {
         }
 
         // 6) re-patch. The superkey we pass is a placeholder - step 7 restores the real one.
+        //    kptools needs kpimg via -k; it was carved out during inspect(). Never let a missing
+        //    blob reach kptools - the error it prints is useless to the user.
+        long blob = KpmShell.fileSize(work + "/kpimg");
+        if (blob <= 0) {
+            res.error = "缺少 kpimg 载体（" + work + "/kpimg 不可读），无法重新打补丁。"
+                    + "请返回上一页刷新环境后重试。";
+            return res;
+        }
+        res.log.append("# 使用 kpimg：").append(blob).append(" 字节\n");
         String cmd = "cd '" + q(work) + "' && mv -f kernel kernel.ori && '"
                 + q(st.kptools) + "' -p -i kernel.ori -S violetbox -k kpimg -o kernel"
                 + args + " 2>&1; echo PATCH_RC=$?";
@@ -694,6 +740,25 @@ public final class KpmEmbedTool {
         if (in != null) {
             try {
                 in.close();
+            } catch (Exception ignored) {
+            }
+        }
+    }
+
+    private static void close(OutputStream out) {
+        if (out != null) {
+            try {
+                out.close();
+            } catch (Exception ignored) {
+            }
+        }
+    }
+
+    /** Best effort local delete; used to clean up staging files the app itself created. */
+    private static void deleteQuietly(File f) {
+        if (f != null) {
+            try {
+                f.delete();
             } catch (Exception ignored) {
             }
         }

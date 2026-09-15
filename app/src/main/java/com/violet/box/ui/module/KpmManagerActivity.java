@@ -1,6 +1,9 @@
 package com.violet.box.ui.module;
 
 import android.annotation.SuppressLint;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.net.Uri;
@@ -615,17 +618,49 @@ public class KpmManagerActivity extends AppCompatActivity {
                     .setMessage(body.toString())
                     .setPositiveButton("知道了", (d, w) -> reload())
                     .setNeutralButton("查看日志", (d, w) -> showLog(log));
+            // On failure the log is the only thing that says what actually happened, so make it
+            // reachable without the extra hop through the log dialog.
+            if (res == null || !res.ok) {
+                b.setNegativeButton(R.string.kpm_log_copy, (d, w) -> copyLog(log));
+            }
             b.show();
         });
     }
 
+    /**
+     * Shows the kptools transcript.
+     *
+     * The dialog body is truncated (very long logs make the dialog unusable), but the clipboard
+     * always gets the <em>whole</em> thing - that is the point of the copy button: the user pastes
+     * it somewhere we can read it. Truncation from the head, not the tail, because the tail is where
+     * the failure usually is.
+     */
     private void showLog(String log) {
-        String text = log == null ? "(空)" : (log.length() > 8000 ? log.substring(log.length() - 8000) : log);
+        final String full = log == null ? "" : log;
+        String shown = full.length() > 8000 ? full.substring(full.length() - 8000) : full;
+        if (full.length() > 8000) shown = "（日志较长，此处只显示最后 8000 字符；用「复制日志」可拿到完整内容）\n\n" + shown;
+        final String forClipboard = full;
         new AlertDialog.Builder(this)
                 .setTitle("kptools 日志")
-                .setMessage(text)
+                .setMessage(shown.isEmpty() ? "(空)" : shown)
                 .setPositiveButton("关闭", null)
+                .setNeutralButton(R.string.kpm_log_copy,
+                        (d, w) -> copyLog(forClipboard))
                 .show();
+    }
+
+    private void copyLog(String log) {
+        if (log == null || log.trim().isEmpty()) {
+            toast(getString(R.string.kpm_log_copy_empty));
+            return;
+        }
+        ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+        if (cm == null) {
+            toast("复制失败：剪贴板不可用");
+            return;
+        }
+        cm.setPrimaryClip(ClipData.newPlainText("VioletBox kptools log", log));
+        toast(getString(R.string.kpm_log_copied) + "（" + log.length() + " 字符）");
     }
 
     // -------------------------------------------------- boot 镜像备份 / 恢复
