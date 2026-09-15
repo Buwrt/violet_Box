@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.io.FileOutputStream;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -26,9 +27,12 @@ import java.util.List;
  * </pre>
  *
  * Installing is therefore pure file placement - no kernel call, no superkey - and takes effect
- * after a reboot. Runtime load/unload is a completely different story: it goes through the
- * KernelPatch supercall (syscall 45, SUPERCALL_KPM_LOAD) which requires the superkey, something
- * only APatch holds. We deliberately do not attempt it.
+ * after a reboot.
+ *
+ * Runtime load is a different story: it goes through the KernelPatch supercall (syscall 45,
+ * SUPERCALL_KPM_LOAD) and needs the superkey. That used to put it out of reach for a third party,
+ * but when the boot image was patched in plaintext mode the key is stored in that very image - the
+ * same one we already parse to preserve root authorisation. See {@link #loadKpm(String, String, int)}.
  */
 public final class KpmShell {
 
@@ -39,6 +43,20 @@ public final class KpmShell {
     public static final String KPTOOLS = APATCH_FOLDER + "bin/kptools";
     /** World-readable scratch area used to hand root-owned .kpm files to our ELF parser. */
     private static final String SCRATCH = "/data/local/tmp/violetbox_kpm";
+
+    /**
+     * Where the supercall helper lands. It is a freestanding aarch64 static ELF built from
+     * {@code kpload.S}: it reads argv, issues syscall 45 and prints the raw return code. Nothing
+     * else - no libc, no file access, no network.
+     */
+    public static final String HELPER = "/data/local/tmp/violetbox_kpload";
+    /** Scratch copy of the module we are about to hand to the kernel. */
+    private static final String LOAD_STAGE = "/data/local/tmp/violetbox_load.kpm";
+
+    /** KernelPatch supercall: {@code sc_kpm_load(key, path, args)}. */
+    private static final long SUPERCALL_KPM_LOAD = 0x1020L;
+    /** Magic the KernelPatch supercall requires in bits 16..31 of the command word. */
+    private static final long SUPERCALL_MAGIC = 0x1158L;
 
     private KpmShell() {
     }
@@ -555,5 +573,110 @@ public final class KpmShell {
     /** Escapes a path so it is safe inside single quotes for /system/bin/sh. */
     static String q(String s) {
         return s == null ? "" : s.replace("'", "'\"'\"'");
+    }
+
+    // ------------------------------------------------------- runtime KPM load
+
+    /**
+     * Pushes the supercall helper out of the APK assets into a root-executable location.
+     *
+     * The helper ships in {@code assets/kpload.arm64}. It has to be re-installed whenever the app
+     * is updated, and it will not run unless the file mode is fixed up afterwards - hence the
+     * chmod inside {@link #loadKpm(String, String, int)}.
+     */
+    public static String installHelper(InputStream asset) {
+        if (asset == null) return "assets 里没有 kpload.arm64";
+        OutputStream os = null;
+        try {
+            File tmp = new File("/data/local/tmp/.violetbox_kpload.tmp");
+            // Write locally first, then hand it to root - /data/local/tmp *is* app-writable on
+            // modern Android, but going through writePrivileged() keeps it working when it isn't.
+            java.io.FileOutputStream f = new java.io.FileOutputStream(tmp);
+            byte[] buf = new byte[8192];
+            int n;
+            while ((n = asset.read(buf)) >= 0) f.write(buf, 0, n);
+            f.close();
+            String err = writePrivileged(tmp, HELPER);
+            deleteQuietly(tmp);
+            return err;
+        } catch (Exception e) {
+            return String.valueOf(e.getMessage());
+        } finally {
+            close(os);
+        }
+    }
+
+    /**
+     * Hot-loads a KPM into the running kernel via the KernelPatch supercall.
+     *
+     * <p>This is the same thing APatch / FolkPatch do for their 「加载」 button:
+     * {@code syscall(45, superkey, ver_and_cmd(SUPERCALL_KPM_LOAD), path, args, NULL)} with
+     * {@code ver_and_cmd = (kp_version << 32) | (0x1158 << 16) | (0x1020 & 0xFFFF)}.
+     *
+     * <p>The reason we can do it at all is that the superkey is not a secret we have to ask for -
+     * when the boot image was patched in plaintext mode, the key sits in the very image we already
+     * parse. In root-key hash mode only a SHA256 is stored and no third party can load; we say so
+     * instead of pretending.
+     *
+     * @return null on success, otherwise a human readable reason including the raw return code
+     */
+    public static String loadKpm(String kpmPath, String superkey, int kpVersion) {
+        if (kpmPath == null || kpmPath.isEmpty()) return "模块路径为空";
+        if (superkey == null || superkey.isEmpty()) return "没有可用的明文 superkey";
+
+        File f = new File(kpmPath);
+        if (!f.isFile() || f.length() <= 0) return "模块文件不可读：" + kpmPath;
+
+        String err = writePrivileged(f, LOAD_STAGE);
+        if (err != null) return "暂存模块失败：" + err;
+
+        long versionCode = kpVersion & 0xFFFFFFFFL;
+        long cmd = (versionCode << 32) | (SUPERCALL_MAGIC << 16) | (SUPERCALL_KPM_LOAD & 0xFFFFL);
+
+        Result r = exec("chmod 0755 '" + q(HELPER) + "' 2>/dev/null; "
+                + "'" + q(HELPER) + "' '" + q(superkey) + "' " + cmd
+                + " '" + q(LOAD_STAGE) + "' '' 2>&1", 30000);
+        String out = r.out == null ? "" : r.out.trim();
+        long rc;
+        try {
+            rc = Long.parseLong(out);
+        } catch (Exception e) {
+            return "无法解析返回值（helper 可能没跑起来）：" + (out.isEmpty() ? "(空输出)" : out);
+        }
+        if (rc == 0) return null;
+        return "加载失败（rc=" + rc + "）" + errnoText(rc);
+    }
+
+    /** Human readable tail for the common supercall failures. */
+    private static String errnoText(long rc) {
+        long e = rc < 0 ? -rc : rc;
+        switch ((int) e) {
+            case 1:   return "：权限不足（EPERM）。superkey 可能不对";
+            case 2:   return "：找不到文件或模块（ENOENT）";
+            case 12:  return "：内存不足（ENOMEM）";
+            case 14:  return "：superkey 错误（EFAULT）";
+            case 22:  return "：参数无效（EINVAL）。KernelPatch 版本可能不匹配";
+            case 38:  return "：内核没有实现 supercall（ENOSYS）。当前内核不是 KernelPatch";
+            case 95:  return "：不支持该操作（EOPNOTSUPP）";
+            default:  return "";
+        }
+    }
+
+    private static void deleteQuietly(File f) {
+        if (f != null) {
+            try {
+                f.delete();
+            } catch (Exception ignored) {
+            }
+        }
+    }
+
+    private static void close(OutputStream os) {
+        if (os != null) {
+            try {
+                os.close();
+            } catch (Exception ignored) {
+            }
+        }
     }
 }

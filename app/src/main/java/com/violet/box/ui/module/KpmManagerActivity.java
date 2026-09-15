@@ -94,6 +94,20 @@ public class KpmManagerActivity extends AppCompatActivity {
     private volatile String embedVersion = "";
     private volatile String embedReason = "";
 
+    /**
+     * Plaintext superkey carved out of the user's own boot image, kept in memory only.
+     *
+     * Empty when the image uses root-key hash mode - in that case only a SHA256 is stored and no
+     * third party (us included) can perform a supercall, so 「加载」 has to be refused up front
+     * rather than failing with an opaque error code.
+     */
+    private volatile String superkey = "";
+    /** KernelPatch version code {@code (major<<16)|(minor<<8)|patch}, needed to build the supercall. */
+    private volatile int kpVersionCode = 0;
+    /** Why 「加载」 is unavailable right now; empty when it is available. */
+    private volatile String loadReason = "";
+    private volatile boolean loadReady = false;
+
     // ------------------------------------------------------------------ model
 
     private static final class Row {
@@ -279,6 +293,12 @@ public class KpmManagerActivity extends AppCompatActivity {
                     embedOk = true;
                     bootDev = ins.device;
                     kpVersion = ins.versionText();
+                    // Remember what a runtime load would need. The key never leaves this process:
+                    // it is not logged, not persisted, not shown.
+                    if (ins.preset != null) {
+                        kpVersionCode = ins.preset.version;
+                        superkey = ins.preset.hasPlaintextKey() ? cstring(ins.preset.superkey) : "";
+                    }
                     for (KpmInfo info : ins.kpms) {
                         embeddedRows.add(new Row(info, false, false, true, ins.device, info.path));
                     }
@@ -319,6 +339,24 @@ public class KpmManagerActivity extends AppCompatActivity {
             embedVersion = verFinal;
             embedReason = embedOkFinal ? "" : embedWhyFinal;
 
+            // Runtime load needs all of: a patched kernel we can identify, a plaintext superkey
+            // (hash mode makes it impossible by design), and an arm64 device (the helper is aarch64).
+            boolean arm64 = isArm64();
+            if (!embedOkFinal) {
+                loadReady = false;
+                loadReason = "内核里没有检测到 KernelPatch 补丁，无法发起 supercall";
+            } else if (!arm64) {
+                loadReady = false;
+                loadReason = "只支持 arm64 设备（当前：" + String.join(", ", abis()) + "）";
+            } else if (superkey.isEmpty()) {
+                loadReady = false;
+                loadReason = "boot 镜像用的是 root-key hash 模式，只存了 superkey 的 SHA256，"
+                        + "拿不到明文 key，第三方无法发起 supercall。请改用「嵌入」或「安装」";
+            } else {
+                loadReady = true;
+                loadReason = "";
+            }
+
             final StringBuilder env4 = new StringBuilder();
             env4.append("嵌入 boot：");
             if (!root) {
@@ -328,6 +366,14 @@ public class KpmManagerActivity extends AppCompatActivity {
             } else {
                 env4.append("不可用");
                 if (!embedWhyFinal.isEmpty()) env4.append(" — ").append(embedWhyFinal);
+            }
+            env4.append("\n热加载：");
+            if (!root) {
+                env4.append("需 ROOT 才能检测");
+            } else if (loadReady) {
+                env4.append("可用（supercall · 明文 superkey）");
+            } else {
+                env4.append("不可用 — ").append(loadReason);
             }
 
             main.post(() -> {
@@ -447,50 +493,74 @@ public class KpmManagerActivity extends AppCompatActivity {
     // --------------------------------------------------------- 选择安装方式
 
     /**
-     * Two legitimate ways exist to get a KPM running, and they behave very differently:
+     * Three legitimate ways exist to get a KPM running, matching how KernelPatch (and therefore
+     * APatch / FolkPatch) think about kernel modules. They behave very differently:
      *
      * <ul>
-     *   <li><b>安装</b> - a plain file under /data/adb/ap/kpm, loaded by APatch at boot, trivially
-     *       removable. This is the default.</li>
-     *   <li><b>嵌入</b> - written into the boot image itself, loaded before /init even starts, which
-     *       is what APatch shows as 「已嵌入」. Removing it means re-patching the boot image again.</li>
+     *   <li><b>嵌入 (embed)</b> - written into the boot image by kptools, loaded at
+     *       {@code pre-kernel-init}, i.e. before /init even starts. Survives reboot; removing it
+     *       means re-patching the boot image.</li>
+     *   <li><b>加载 (load)</b> - hot-loaded into the running kernel through the KernelPatch
+     *       supercall. Takes effect immediately, gone after a reboot. Needs the superkey.</li>
+     *   <li><b>安装 (install)</b> - a plain file under /data/adb/ap/kpm, loaded by APatch's boot
+     *       time loader. Survives reboot and can be removed at any time.</li>
      * </ul>
      */
     private void confirmDest(final KpmInfo info) {
-        final String[] labels = {
-                "安装到模块目录（推荐，可随时卸载）",
-                "嵌入到 boot 镜像（随内核最早启动）",
-        };
-        final int[] choice = {0};
-        ArrayAdapter<String> ladapter = new ArrayAdapter<String>(
-                this, android.R.layout.simple_list_item_single_choice, labels) {
-            @NonNull
-            @Override
-            public View getView(int position, @Nullable View convertView, @NonNull ViewGroup parent) {
-                View v = super.getView(position, convertView, parent);
-                boolean enabled = isEnabled(position);
-                v.setEnabled(enabled);
-                TextView tv = v.findViewById(android.R.id.text1);
-                if (tv != null) {
-                    tv.setEnabled(enabled);
-                    tv.setAlpha(enabled ? 1f : 0.38f);
-                }
-                return v;
-            }
+        StringBuilder msg = new StringBuilder();
+        msg.append("模块：").append(info.displayName()).append("\n\n");
+        msg.append("嵌入：写进 boot 镜像，内核启动最早阶段加载，重启后仍在；移除要重新打包 boot。\n");
+        msg.append("加载：运行时热加载，立即生效，重启后失效；需要明文 superkey。\n");
+        msg.append("安装：放进 /data/adb/ap/kpm/，开机加载，可随时卸载。\n");
+        if (!loadReady) {
+            msg.append("\n注意：加载当前不可用 —— ").append(loadReason);
+        }
 
-            @Override
-            public boolean isEnabled(int position) {
-                return position != 1 || embedReady;
-            }
-        };
+        // Button order in an AlertDialog is neutral | negative | positive, so this reads
+        // 嵌入 | 加载 | 安装 left to right.
+        AlertDialog.Builder b = new AlertDialog.Builder(this)
+                .setTitle("刷入方式")
+                .setMessage(msg.toString())
+                .setNeutralButton("嵌入", (d, w) -> confirmEmbed(info))
+                .setPositiveButton("安装", (d, w) -> confirmInstall(info));
+        if (loadReady) {
+            b.setNegativeButton("加载", (d, w) -> confirmLoad(info));
+        } else {
+            b.setNegativeButton("加载", (d, w) -> showLoadUnavailable());
+        }
+        b.show();
+    }
+
+    /** The 「刷入」 button on a file row: embed or load, no install (that is a separate flow). */
+    private void confirmFlashDest(final KpmInfo info) {
+        StringBuilder msg = new StringBuilder();
+        msg.append("模块：").append(info.displayName()).append("\n\n");
+        msg.append("嵌入：写进 boot 镜像，内核启动最早阶段加载，重启后仍在。\n");
+        msg.append("加载：运行时热加载，立即生效，重启后失效。\n");
+        if (!loadReady) {
+            msg.append("\n注意：加载当前不可用 —— ").append(loadReason);
+        }
         new AlertDialog.Builder(this)
-                .setTitle("刷入方式：" + info.displayName())
-                .setSingleChoiceItems(ladapter, 0, (d, which) -> choice[0] = which)
-                .setNegativeButton("取消", null)
-                .setPositiveButton("继续", (d, w) -> {
-                    if (choice[0] == 1) confirmEmbed(info);
-                    else confirmInstall(info);
+                .setTitle("刷入方式")
+                .setMessage(msg.toString())
+                .setNegativeButton("嵌入", (d, w) -> confirmEmbed(info))
+                .setPositiveButton("加载", (d, w) -> {
+                    if (loadReady) confirmLoad(info);
+                    else showLoadUnavailable();
                 })
+                .show();
+    }
+
+    private void showLoadUnavailable() {
+        new AlertDialog.Builder(this)
+                .setTitle("无法加载")
+                .setMessage(loadReason
+                        + "\n\n「加载」走的是 KernelPatch 的 supercall（syscall 45），"
+                        + "必须用 superkey 才能发起。这是内核级别的门槛，不是权限没给够。"
+                        + "\n\n可以改用：\n"
+                        + "· 嵌入 —— 写进 boot 镜像，重启后照样生效\n"
+                        + "· 安装 —— 放进模块目录，开机加载，可随时卸载")
+                .setPositiveButton("知道了", null)
                 .show();
     }
 
@@ -757,6 +827,68 @@ public class KpmManagerActivity extends AppCompatActivity {
         b.show();
     }
 
+    /**
+     * Runtime hot-load. Explains what it is about to do before doing it, because unlike the other
+     * two routes this one talks to the kernel directly and only lasts until the next reboot.
+     */
+    private void confirmLoad(final KpmInfo info) {
+        if (!ensureRoot()) return;
+        if (!loadReady) {
+            showLoadUnavailable();
+            return;
+        }
+        StringBuilder msg = new StringBuilder();
+        msg.append("模块：").append(info.displayName()).append('\n');
+        msg.append("KernelPatch：").append(embedVersion).append('\n');
+        msg.append("方式：supercall（syscall 45 · SUPERCALL_KPM_LOAD）\n\n");
+        msg.append("· 立即生效，不需要重启\n");
+        msg.append("· 重启后失效，想长期保留请用「嵌入」或「安装」\n");
+        msg.append("· superkey 取自你自己的 boot 镜像，不会上传也不会保存\n\n");
+        msg.append("热加载有让内核崩溃重启的风险，请先保存好数据。");
+        new AlertDialog.Builder(this)
+                .setTitle("加载 KPM 到内核")
+                .setMessage(msg.toString())
+                .setNegativeButton("取消", null)
+                .setPositiveButton("加载", (d, w) -> runLoad(info))
+                .show();
+    }
+
+    private void runLoad(final KpmInfo info) {
+        busy(true);
+        io.execute(() -> {
+            String err = null;
+            try (java.io.InputStream in = getAssets().open("kpload.arm64")) {
+                err = KpmShell.installHelper(in);
+            } catch (Exception e) {
+                err = "释放 supercall 工具失败：" + e.getMessage();
+            }
+            if (err == null) {
+                err = KpmShell.loadKpm(info.path, superkey, kpVersionCode);
+            }
+            final String finalErr = err;
+            main.post(() -> {
+                busy(false);
+                if (finalErr == null) {
+                    new AlertDialog.Builder(KpmManagerActivity.this)
+                            .setTitle("已加载到内核")
+                            .setMessage(info.displayName() + "\n\n已通过 supercall 热加载，现在就生效。"
+                                    + "\n重启后会失效；想长期保留请用「嵌入」或「安装」。")
+                            .setPositiveButton("知道了", (d, w) -> reload())
+                            .show();
+                } else {
+                    new AlertDialog.Builder(KpmManagerActivity.this)
+                            .setTitle("加载失败")
+                            .setMessage(finalErr
+                                    + "\n\n没有对系统做任何改动。可以改用「嵌入」或「安装」——"
+                                    + "这两条路不依赖 superkey。")
+                            .setNegativeButton("知道了", null)
+                            .setPositiveButton("复制原因", (d, w) -> copyLog(finalErr))
+                            .show();
+                }
+            });
+        });
+    }
+
     private void doInstall(KpmInfo info) {
         busy(true);
         io.execute(() -> {
@@ -1001,7 +1133,9 @@ public class KpmManagerActivity extends AppCompatActivity {
 
             btnInstall.setOnClickListener(v -> {
                 if (!ensureRoot()) return;
-                confirmInstall(info);
+                // 已嵌入的卡片这里是「导出」，只有磁盘上待刷入的文件才走选择刷入方式
+                if (row.embedded) return;
+                confirmFlashDest(info);
             });
             btnToggle.setOnClickListener(v -> {
                 if (!ensureRoot()) return;
@@ -1012,6 +1146,26 @@ public class KpmManagerActivity extends AppCompatActivity {
                 confirmUninstall(row);
             });
         }
+    }
+
+    /** NUL-terminated C string out of a fixed size byte buffer. */
+    private static String cstring(byte[] b) {
+        int end = 0;
+        while (end < b.length && b[end] != 0) end++;
+        return new String(b, 0, end, java.nio.charset.StandardCharsets.UTF_8).trim();
+    }
+
+    private static String[] abis() {
+        String[] a = android.os.Build.SUPPORTED_ABIS;
+        return a == null ? new String[]{"unknown"} : a;
+    }
+
+    /** The supercall helper is aarch64 only; refuse rather than crash on 32-bit devices. */
+    private static boolean isArm64() {
+        for (String a : abis()) {
+            if (a != null && a.toLowerCase().startsWith("arm64")) return true;
+        }
+        return false;
     }
 
     /** Guard for the row buttons. Uses the value cached by the last scan - calling "su" here
