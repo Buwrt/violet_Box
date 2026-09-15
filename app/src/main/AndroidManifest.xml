@@ -85,6 +85,9 @@
         <activity
             android:name=".ui.repo.ModuleRepoActivity"
             android:exported="false" />
+        <activity
+            android:name=".ui.module.KpmManagerActivity"
+            android:exported="false" />
 
 
         <provider

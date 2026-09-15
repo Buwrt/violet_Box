@@ -5,11 +5,7 @@ plugins {
 
 android {
     namespace = "com.violet.box"
-    compileSdk {
-        version = release(36) {
-            minorApiLevel = 1
-        }
-    }
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.violet.box"
@@ -30,16 +26,14 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            // 本 fork 没有原作者的发布密钥，若不指定签名配置，assembleRelease 产出的是
-            // 未签名 APK，装不上。退而用 debug 密钥签名，保证 release 包可直接安装。
-            // 若你有自己的 .jks，在这里换成正式的 signingConfig 即可。
+            // 离线重打包：无原作者签名密钥，改用 debug 签名以便安装
             signingConfig = signingConfigs.getByName("debug")
         }
     }
     buildFeatures {
         compose = true
         buildConfig = true
-        aidl = true
+        aidl = false
     }
 
     androidResources {

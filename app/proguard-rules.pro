@@ -30,3 +30,8 @@
 -keep class com.violet.box.data.detector.** { *; }
 -keep class com.violet.box.ui.detect.** { *; }
 -keep class com.scottyab.rootbeer.** { *; }
+
+# KPM 刷写：ELF 解析器依赖 .kpm.info 段名常量与字段顺序，且 KpmShell 里的 shell 脚本
+# 以字符串形式保存，被重命名/合并后无法排查
+-keep class com.violet.box.kpm.** { *; }
+-keep class com.violet.box.ui.module.KpmManagerActivity { *; }
