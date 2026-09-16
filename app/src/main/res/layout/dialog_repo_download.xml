@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 下载进度：文件名 + 百分比 + 进度条 + 已下载体积 -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingStart="20dp"
+    android:paddingTop="4dp"
+    android:paddingEnd="20dp"
+    android:paddingBottom="8dp">
+
+    <TextView
+        android:id="@+id/tvDlFile"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:ellipsize="middle"
+        android:fontFamily="sans-serif-medium"
+        android:singleLine="true"
+        android:text="准备下载…"
+        android:textColor="@color/explore_slate_800"
+        android:textSize="14sp" />
+
+    <ProgressBar
+        android:id="@+id/pbDl"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="14dp"
+        android:indeterminate="true"
+        android:max="100"
+        android:progressTint="@color/ios_accent" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/tvDlPercent"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:fontFamily="sans-serif-medium"
+            android:text="0%"
+            android:textColor="@color/ios_accent"
+            android:textSize="13sp" />
+
+        <TextView
+            android:id="@+id/tvDlSize"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text=""
+            android:textColor="@color/explore_slate_500"
+            android:textSize="12sp" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/tvDlHint"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="正在连接 GitHub，若长时间无进度可尝试切换网络"
+        android:textColor="@color/explore_slate_500"
+        android:textSize="11sp" />
+</LinearLayout>

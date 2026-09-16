@@ -59,7 +59,29 @@ final class RepoClient {
     }
 
     private static final String API = "https://api.github.com/repos/%s/%s/releases?per_page=100";
+    /** GitLab 有自己的 REST 端点，项目和 GitHub 的 owner/repo 不是一回事。 */
+    private static final String GL_API =
+            "https://gitlab.com/api/v4/projects/%s/releases?per_page=100";
     private static final String UA = "violet-box-module-repo";
+
+    /**  GitLab 的项目 id 要做 URL 转义（斜杠编码成 %2F）。 */
+    private static String glProjectId(ModuleEntry entry) {
+        String path = entry.owner + "/" + entry.repo;
+        try {
+            return java.net.URLEncoder.encode(path, "UTF-8").replace("+", "%20");
+        } catch (Exception e) {
+            return path;
+        }
+    }
+
+    /** GitLab 的附件链接很多是相对路径（/uploads/...），要补成绝对地址。 */
+    private static String glAbsolute(String path, String maybeUrl) {
+        if (maybeUrl == null) return "";
+        String u = maybeUrl.trim();
+        if (u.startsWith("http://") || u.startsWith("https://")) return u;
+        if (u.startsWith("/")) return "https://gitlab.com" + u;
+        return "https://gitlab.com/" + path + "/-/releases/" + u;
+    }
 
     /**
      * Hosts that proxy github.com. The first entry is the direct URL; the rest rewrite
@@ -97,6 +119,7 @@ final class RepoClient {
      * what we hand out as "latest" when the user does not pick anything.
      */
     List<ReleaseInfo> listReleases(ModuleEntry entry) throws Exception {
+        if (entry.isGitlab()) return listGitlabReleases(entry);
         String url = String.format(API, entry.owner, entry.repo);
         Request request = new Request.Builder()
                 .url(url)
@@ -118,6 +141,55 @@ final class RepoClient {
             String json = body.string();
             return filterReleases(new JSONArray(json), entry);
         }
+    }
+
+    /**
+     * GitLab 的 releases 结构和 GitHub 不一样：
+     * 产物在 <code>assets.links[]</code> 里，字段叫 <code>direct_asset_url</code>，
+     * 名字也是一个较长的前缀。这里先转成 GitHub 那一套 ReleaseInfo，后面复用同一套筛选。
+     */
+    private List<ReleaseInfo> listGitlabReleases(ModuleEntry entry) throws Exception {
+        String url = String.format(GL_API, glProjectId(entry));
+        Request request = new Request.Builder()
+                .url(url)
+                .header("User-Agent", UA)
+                .build();
+        JSONArray converted = new JSONArray();
+        try (Response response = client.newCall(request).execute()) {
+            if (!response.isSuccessful()) {
+                throw new RepoException("拉取 GitLab 版本列表失败：HTTP " + response.code(), false);
+            }
+            ResponseBody body = response.body();
+            if (body == null) throw new RepoException("响应为空", false);
+            JSONArray rels = new JSONArray(body.string());
+            String path = entry.owner + "/" + entry.repo;
+            for (int i = 0; i < rels.length(); i++) {
+                JSONObject rel = rels.optJSONObject(i);
+                if (rel == null) continue;
+                JSONObject out = new JSONObject();
+                out.put("tag_name", rel.optString("tag_name", "?"));
+                out.put("name", rel.optString("name", ""));
+                JSONArray assets = new JSONArray();
+                JSONObject links = rel.optJSONObject("assets");
+                JSONArray arr = links != null ? links.optJSONArray("links") : null;
+                if (arr != null) {
+                    for (int j = 0; j < arr.length(); j++) {
+                        JSONObject link = arr.optJSONObject(j);
+                        if (link == null) continue;
+                        JSONObject a = new JSONObject();
+                        a.put("name", link.optString("name", ""));
+                        String direct = link.optString("direct_asset_url", "");
+                        a.put("browser_download_url",
+                                !direct.isEmpty() ? direct : glAbsolute(path, link.optString("url", "")));
+                        a.put("size", 0L);
+                        assets.put(a);
+                    }
+                }
+                out.put("assets", assets);
+                converted.put(out);
+            }
+        }
+        return filterReleases(converted, entry);
     }
 
     /**
@@ -165,10 +237,17 @@ final class RepoClient {
                 String fileName = asset.optString("name", "");
                 String lower = fileName.toLowerCase(Locale.US);
                 boolean suffixHit = lower.endsWith(suffix);
-                boolean archiveHit = acceptAnyArchive && (lower.endsWith(".zip") || lower.endsWith(".kpm"));
+                // 兜底时三类产物都认：ZIP 刷入包、KPM 内核模块、LSP 模块 apk
+                boolean archiveHit = acceptAnyArchive && (lower.endsWith(".zip")
+                        || lower.endsWith(".kpm") || lower.endsWith(".apk"));
                 if (!suffixHit && !archiveHit) continue;
                 if (chosen == null) chosen = asset;
-                if (!keyword.isEmpty() && lower.contains(keyword)) {
+                // 清单里记的关键字可能和真实文件名的分隔符不一致
+                // （例如目录里写 dirtyduck-selinux，文件叫 dirtyduck_selinux_0.1.5.kpm），
+                // 所以横杠和下划线要当成同一个字符来比，否则多产物仓库会挑错文件。
+                if (!keyword.isEmpty()
+                        && (lower.contains(keyword)
+                            || lower.replace('-', '_').contains(keyword.replace('-', '_')))) {
                     chosen = asset;      // explicit catalog hint wins
                     break;
                 }

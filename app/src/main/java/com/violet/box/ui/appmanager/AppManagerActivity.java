@@ -55,10 +55,14 @@ import java.util.concurrent.Executors;
 public class AppManagerActivity extends AppCompatActivity {
 
     private static final String FILE_PROVIDER_AUTHORITY_SUFFIX = ".fileprovider";
-    /** 导出 APK 子目录（在系统「下载」下） */
-    private static final String DOWNLOAD_APK_SUBDIR = "VioletApk";
+    /**
+     * 导出目录统一收在公共下载目录的 VioletBox 里：
+     * /storage/emulated/0/Download/VioletBox/apk 和 /storage/emulated/0/Download/VioletBox/应用备份
+     * 这样模块下载、备份、APK 导出都只有一个根文件夹，用户不用满手机找。
+     */
+    private static final String DOWNLOAD_APK_SUBDIR = "VioletBox/apk";
     /** Root 备份 tar 输出目录（用户可见「下载」下） */
-    private static final String DOWNLOAD_BACKUP_SUBDIR = "VioletAppBackup";
+    private static final String DOWNLOAD_BACKUP_SUBDIR = "VioletBox/应用备份";
 
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private ExecutorService loadExecutor;

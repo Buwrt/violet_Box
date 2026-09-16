@@ -86,6 +86,18 @@
                 android:textColor="@color/explore_slate_500"
                 android:textSize="12sp" />
 
+            <!-- 来源标注：官方（原作者仓库）用蓝色小字，镜像（官方模块仓库）用灰色 -->
+            <TextView
+                android:id="@+id/tvRepoItemAuthor"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:ellipsize="end"
+                android:singleLine="true"
+                android:text="官方 · 作者"
+                android:textColor="@color/explore_blue_600"
+                android:textSize="11sp" />
+
             <TextView
                 android:id="@+id/tvRepoItemRepo"
                 android:layout_width="match_parent"

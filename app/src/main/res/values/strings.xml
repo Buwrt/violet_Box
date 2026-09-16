@@ -1,3 +1,5 @@
 <resources>
-    <string name="app_name">紫罗兰盒子</string>
+    <string name="app_name">紫罗兰Box</string>
+    <!-- 关于页 / 副标题里显示的品牌全称，改这里即可全局生效 -->
+    <string name="app_name_full">紫罗兰Box</string>
 </resources>

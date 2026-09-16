@@ -305,10 +305,13 @@ public class ModuleBackupActivity extends AppCompatActivity {
         dialog.show();
 
         new Thread(() -> {
-            String backupDir = "/storage/emulated/0/Magisk模块备份"
-                    + (isKpmMode() ? "/内核模块" : "");
+            // 统一放在公共下载目录下的 VioletBox，和模块下载、APK 导出同一个地方，
+            // 用户在文件管理器里只找 VioletBox 一个文件夹就够了。
+            String backupDir = com.violet.box.core.util.VioletPaths.PUBLIC_ROOT + "/备份"
+                    + (isKpmMode() ? "/内核模块" : "/ZIP模块");
             try {
-                new ProcessBuilder("su", "-c", "mkdir -p \"" + backupDir + "\"").start().waitFor();
+                new ProcessBuilder("su", "-c", "mkdir -p \"" + backupDir + "\" && chmod 777 \""
+                        + com.violet.box.core.util.VioletPaths.PUBLIC_ROOT + "\"").start().waitFor();
             } catch (Exception ignored) {}
 
             int success = 0;
