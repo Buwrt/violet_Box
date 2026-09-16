@@ -119,7 +119,19 @@ app/src/main/res/layout/
 
 ## 📥 下载
 
-- 前往 [Releases](https://github.com/Smart-Paocai/violet_Box/releases) 下载最新版本
+最新版 **V12（紫罗兰Box 1.1.1）**，两个包源码相同、功能一致，差别只在是否可调试：
+
+| 文件 | 大小 | 说明 |
+| --- | --- | --- |
+| [**VioletBox-V12-release.apk**](https://github.com/Buwrt/violet_Box/raw/main/apk/VioletBox-V12-release.apk) | 3.8 MB | 正式版，日常使用装这个 |
+| [**VioletBox-V12-debug.apk**](https://github.com/Buwrt/violet_Box/raw/main/apk/VioletBox-V12-debug.apk) | 18 MB | 带调试符号，排查问题时用 |
+
+也可以到 [Releases](https://github.com/Buwrt/violet_Box/releases) 页面，或直接进仓库的
+[`apk/`](https://github.com/Buwrt/violet_Box/tree/main/apk) 目录。
+
+> ⚠️ release 与 debug **签名不同**，互相不能直接覆盖安装，切换前请先卸载旧版。
+
+历史版本按标签回溯（`git tag -l`），V4~V12 的每个版本在 Releases 里都有对应说明。
 - 交流群组：[Telegram 频道](https://t.me/violettoolbox)
 
 ## 🛠️ 编译步骤
