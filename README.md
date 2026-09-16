@@ -1,12 +1,13 @@
 <div align="center">
 
-## 紫罗兰盒子 (VioletBox)
+## 紫罗兰Box（VioletBox）
 
 [![License: GPL 3.0](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://github.com/Smart-Paocai/violet_Box/tree/main?tab=GPL-3.0-1-ov-file)
 [![Telegram Channel](https://img.shields.io/badge/Telegram-Channel-2CA5E0?style=flat-square&logo=telegram)](https://t.me/violettoolbox)
-[![Release](https://img.shields.io/badge/Release-v1.1.0-success.svg?style=flat-square)](https://github.com/Smart-Paocai/violet_Box/releases)
+[![Release](https://img.shields.io/badge/Release-v1.1.1-success.svg?style=flat-square)](https://github.com/Buwrt/violet_Box/releases)
+[![Modules](https://img.shields.io/badge/%E6%A8%A1%E5%9D%97-3821-blueviolet?style=flat-square)](https://github.com/Buwrt/violet_Box/releases/tag/v1.1.1-V12)
 
-**一款根据用户需求设计的 Android 玩机工具箱，我们后续将集成更多移动端的实用功能，为ROOT用户以及非ROOT用户提供更好的玩机体验！**
+**一款根据用户需求设计的 Android 玩机工具箱，内置 3821 个开源模块（ZIP / LSP / KPM）的下载中心，支持后台下载；为ROOT用户以及非ROOT用户提供更好的玩机体验！**
 
 
 </div>
@@ -42,30 +43,30 @@ git checkout v1.1.0-V6         # 回到 V6 的源码
 # 或 git checkout V6
 ```
 
-每个标签在 [Releases](https://github.com/Buwrt/violet_Box/releases) 里都挂了对应的
-`VioletBox-Vx-release.apk` / `VioletBox-Vx-debug.apk`，不想编译就直接下当年那个包。
+带 APK 附件的版本：**V4、V5、V6、V7、V8、V9、V12**（每个 release / debug 两个包）。
+V10、V11、V11修改版只打了标签没发 Release，需要的话按上面的命令 checkout 后自行编译。
 
-### 新增文件一览
+### 📁 当前源码结构（V11 起已移除 KPM 刷写）
 
 ```
-app/src/main/java/com/violet/box/kpm/            # KPM 内核模块（V5 起）
-    KpmInfo.java        # .kpm.info 段解析（name/version/author/license/description）
-    KpmShell.java       # shell 通道、boot 分区枚举、APatch 目录与 preset 探测
-    KpmEmbedded.java    # V7  解析 kptools patch 布局，读出「已嵌入」的 KPM
-    KpmPreset.java      # V8  在打过补丁的 kernel 里定位 kpimg 并读出 patch preset
-    KpmEmbedTool.java   # V8  嵌入写入流水线（11 道闸门 + 自动备份 + 端到端校验）
-app/src/main/java/com/violet/box/ui/module/
-    KpmManagerActivity.java     # V5  KPM 刷写页（列表 / 安装 / 嵌入 / 移除 / 日志）
-app/src/main/java/com/violet/box/ui/repo/          # 模块下载中心
-    ModuleRepoActivity.java  ModuleRepoAdapter.java  ModuleEntry.java  RepoClient.java
-app/src/main/java/com/violet/box/ui/detect/        # 环境检测 UI（b42df36 捞回）
+app/src/main/java/com/violet/box/core/util/    # 核心工具
+    VioletPaths.java        # V12  落盘路径中心（公共 Download/VioletBox + root 兜底）
+    SelinuxShellUtil.java   # su -c 执行封装（SelinuxShell 通用）
+    BatterySysFiles.java  GpuInfoQuery.java  SelinuxStatusReader.java
+app/src/main/java/com/violet/box/ui/repo/      # 模块下载中心（V1 起，V12 重做）
+    ModuleRepoActivity.java   # 列表 / 搜索 / 版本选择 / 后台下载 + 通知栏进度
+    ModuleRepoAdapter.java    # 列表渲染，官方蓝字 / 镜像灰字的来源标注
+    ModuleEntry.java          # 清单条目模型（含 official / upstream / host）
+    RepoClient.java           # GitHub + GitLab REST 拉取与下载
+app/src/main/java/com/violet/box/ui/detect/    # 环境检测 UI（V3 从 b42df36 捞回）
     DetectFragment.java  DetectViewBinder.java
-app/src/main/java/com/violet/box/data/detector/     # 环境检测逻辑（b42df36 捞回）
+app/src/main/java/com/violet/box/data/detector/ # 环境检测逻辑
     RootDetector.java  HardcodedSignals.java  AdvancedRuntimeDetector.java
-app/src/main/java/com/scottyab/rootbeer/           # RootBeer 本地化（Maven 取不到，改为内置源码）
-app/src/main/assets/module_repo.json                # 178 个模块目录
+app/src/main/java/com/scottyab/rootbeer/       # RootBeer 本地化（Maven 取不到，改为内置源码）
+app/src/main/assets/module_repo.json           # V12：3821 个模块清单（ZIP 1687 / LSP 2087 / KPM 47）
 app/src/main/res/layout/
-    activity_module_repo.xml  item_module_repo.xml  fragment_detect.xml
+    activity_module_repo.xml  item_module_repo.xml
+    dialog_repo_download.xml  dialog_repo_header.xml  item_repo_release.xml
 ```
 
 ### 📄 文档
@@ -80,16 +81,19 @@ app/src/main/res/layout/
 | [`docs/V9_删除按钮与运行环境折叠.md`](docs/V9_删除按钮与运行环境折叠.md) | 删除按钮的安全边界、运行环境折叠状态的持久化与摘要 |
 | [`docs/V10_嵌入加载安装三选一.md`](docs/V10_嵌入加载安装三选一.md) | 三条刷入路径的区别、supercall 热加载的实现与限制 |
 | [`docs/V11_移除KPM刷写.md`](docs/V11_移除KPM刷写.md) | 本次删除的完整清单、保留项及原因、如何把功能找回来 |
+| [`docs/V11修改版_恢复KPM备份.md`](docs/V11修改版_恢复KPM备份.md) | V11 误删的「内核模块」备份怎么加回来的（只读，不恢复刷写） |
+| [`docs/V12修复版_说明.md`](docs/V12修复版_说明.md) | 后台下载的实现、落盘路径的分区存储坑与三级兜底、分类计数修复、3821 个模块的采集与校验方式 |
 | [`docs/环境检测恢复说明_b42df36.md`](docs/环境检测恢复说明_b42df36.md) | 环境检测是怎么从 `b42df36` 捞回来的、修了哪些 bug |
 | [`docs/ROOT隐藏模块全谱系与原理手册.md`](docs/ROOT隐藏模块全谱系与原理手册.md) | 隐藏 Root 的模块原理（Zygisk / PIF / TrickyStore / SUSFS 等） |
 | [`docs/violet_Box_仓库分析报告.md`](docs/violet_Box_仓库分析报告.md) | 上游仓库的整体结构与代码分析 |
 
 ### ⚠️ 使用提醒
 
-- **KPM 嵌入是自担风险的操作**：`KpmEmbedTool` 会先把当前 boot 备份到 `内部存储/Download/VioletBox/`，默认按钮是「仅生成」（不写分区），写分区前会经过 11 道校验。仍然请务必确认备份存在再动手。
-- **签名**：`app/build.gradle.kts` 里 release 构建改用 debug 密钥签名（因为没有原作者的 keystore），所以打出的包**不能覆盖安装官方版**，装之前需先卸载旧版。有正式 keystore 的话改回即可。
-- **模块目录可远程更新**：`ModuleRepoActivity` 里的 `CATALOG_URL` 指向仓库 raw 文件，维护一份 JSON 就能不升级 APK 更新目录；拉不到时自动回退内置清单。
-- **`补丁包/`**：独立交付的增量包形态（含 `module_repo.json` 与变更过的源码副本），用于不想整体 checkout 的场景；主源码仍是 `app/`。
+- **签名**：`app/build.gradle.kts` 里 release 构建用 debug 密钥签名（没有原作者的 keystore），所以打出的包**不能覆盖安装官方版**；且 release 与 debug 签名不同，两者切换前都要先卸载旧版。有正式 keystore 的话改回即可。
+- **文件落在哪里**：V12 起下载、模块备份、APK 导出、应用备份**全部统一到 `/storage/emulated/0/Download/VioletBox`**。Android 11+ 分区存储会限制应用写公共目录，应用内已做了「申请所有文件访问权限 + root 兜底」两条路，实在写不进去才会退回私有目录。
+- **模块的开源口径**：收录标准是**有公开源码 + 源码不含格机或破坏性代码**（不要求 LICENSE 文件）。危险的擦除 / 格式化类项目和 Xml 一概不收，但模块本身的风险请自行判断，刷机有风险。
+- **模块列表自动更新**：`ModuleRepoActivity` 里的 `CATALOG_URL` 指向仓库 raw 文件，维护一份 JSON 就能不升级 APK 更新目录；拉不到时自动回退内置清单。作者发布新版本 module 时，应用会实时拉最新 release。
+- **`补丁包/`**：早期版本留下的增量包形态（含源码副本），仅供参考；主源码看 `app/`。
 
 ---
 
@@ -107,7 +111,8 @@ app/src/main/res/layout/
 | 🎭 全局机型伪装 | resetprop 修改机型与构建指纹 |
 | ☁️ Payload 云提取 | 在线下载 OTA 固件并提取指定分区镜像 |
 | 🧩 紫罗兰插件 | 内核伪装 / TrickyStore扩展 / 隐藏应用列表配置 |
-| 🔧 KPM 刷写 | 列出设备上的内核模块（含 boot 内嵌），支持安装到模块目录或直接嵌入 boot 镜像 |
+| 🧰 模块下载中心 | **3821 个开源模块**：ZIP 1687 / LSP 2087 / KPM 47，分类筛选、实时搜索、选版本、**后台下载**、长按复制开源地址 |
+| 💾 模块备份 | ZIP 模块与内核模块快照，备份到 `Download/VioletBox/备份/` |
 
 ## 🛡️ 摇一摇广告防护（免 Root）
 
@@ -119,19 +124,19 @@ app/src/main/res/layout/
 
 ## 📥 下载
 
-最新版 **V12（紫罗兰Box 1.1.1）**，两个包源码相同、功能一致，差别只在是否可调试：
+最新版 **V12（紫罗兰Box · 1.1.1）**，APK 作为 Release 附件提供：
 
-| 文件 | 大小 | 说明 |
+| 文件 | 大小 | sha256 |
 | --- | --- | --- |
-| [**VioletBox-V12-release.apk**](https://github.com/Buwrt/violet_Box/raw/main/apk/VioletBox-V12-release.apk) | 3.8 MB | 正式版，日常使用装这个 |
-| [**VioletBox-V12-debug.apk**](https://github.com/Buwrt/violet_Box/raw/main/apk/VioletBox-V12-debug.apk) | 18 MB | 带调试符号，排查问题时用 |
+| [**VioletBox-V12-release.apk**](https://github.com/Buwrt/violet_Box/releases/download/v1.1.1-V12/VioletBox-V12-release.apk) | 3.8 MB | `29a75d2c493d1602c832600be89ab7edb2222d8dbe828016aa51d15063a0303c` |
+| [**VioletBox-V12-debug.apk**](https://github.com/Buwrt/violet_Box/releases/download/v1.1.1-V12/VioletBox-V12-debug.apk) | 18 MB | `46a679ee84cd6634df0db44d7ab6ffce231653ba11f074a9dce13f421c520c36` |
 
-也可以到 [Releases](https://github.com/Buwrt/violet_Box/releases) 页面，或直接进仓库的
-[`apk/`](https://github.com/Buwrt/violet_Box/tree/main/apk) 目录。
+👉 [Releases 页面](https://github.com/Buwrt/violet_Box/releases) · [V12 发布说明](https://github.com/Buwrt/violet_Box/releases/tag/v1.1.1-V12)
 
+日常用 release 包；debug 包带调试符号，排查问题时用。两者源码相同、功能一致。
 > ⚠️ release 与 debug **签名不同**，互相不能直接覆盖安装，切换前请先卸载旧版。
 
-历史版本按标签回溯（`git tag -l`），V4~V12 的每个版本在 Releases 里都有对应说明。
+之前的 V4~V9 也各有一份 Release 附件；V10 / V11 / V11修改版只打了标签没发包，需要的话 `git checkout V11` 自行编译。
 - 交流群组：[Telegram 频道](https://t.me/violettoolbox)
 
 ## 🛠️ 编译步骤
