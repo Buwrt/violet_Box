@@ -15,7 +15,7 @@
 
 ## 🍴 关于本仓库（Fork 说明）
 
-本仓库 fork 自 [Smart-Paocai/violet_Box](https://github.com/Smart-Paocai/violet_Box)，**保留完整上游提交历史**，同样遵循 **GPL-3.0**。在上游基础上做了八个版本的改动，**每个版本一次提交、一个标签，可随时回到任意版本**：
+本仓库 fork 自 [Smart-Paocai/violet_Box](https://github.com/Smart-Paocai/violet_Box)，**保留完整上游提交历史**，同样遵循 **GPL-3.0**。在上游基础上做了十二个版本的改动，**每个版本一次提交、一个标签，可随时回到任意版本**：
 
 | 版本 | 标签 | 改动 |
 | --- | --- | --- |
@@ -37,7 +37,7 @@
 ```bash
 git clone https://github.com/Buwrt/violet_Box.git
 cd violet_Box
-git tag -l                     # v1.1.0-V4 … v1.1.0-V8（同时存在简写 V5…V8）
+git tag -l                     # v1.1.0-V4 … v1.1.1-V12（同时存在简写 V5…V12）
 git checkout v1.1.0-V6         # 回到 V6 的源码
 # 或 git checkout V6
 ```

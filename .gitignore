@@ -17,3 +17,7 @@ local.properties
 /jadx.zip
 /tools/
 .kotlin/
+
+# IDEA / 本地构建缓存
+.idea/
+*.part
