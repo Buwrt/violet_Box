@@ -27,13 +27,6 @@ public final class LocalRomCatalog {
     /** 外链条目在「区域 / 版本类型」上的通配值：任何筛选条件都匹配。 */
     public static final String WILDCARD = "见页面";
 
-    /** 清单里声明的全部系统版本取值，供 UI 建下拉框。 */
-    public static List<String> systems(Context ctx) {
-        List<String> out = new ArrayList<>(load(ctx).systems);
-        if (out.isEmpty()) out.add(WILDCARD);
-        return out;
-    }
-
     /** 一条版本记录。 */
     public static final class Version {
         public final String version;
@@ -56,14 +49,12 @@ public final class LocalRomCatalog {
         public final boolean payload;
         /** true = 这是第三方站的机型下载页，要用浏览器打开，不是文件直链。 */
         public final boolean external;
-        /** 系统版本名：MIUI 14 / 澎湃OS 3 / ColorOS 16 / OxygenOS 15 / realme UI 5 … */
-        public final String system;
         /** 同固件的其它分块（一加归档的 firmware / logical 分卷 / hash）。 */
         public final Map<String, String> extra;
 
         Version(String version, String regionCode, String region, String versionType,
-                String romType, String system, String android, String url, long size,
-                String date, String note, String source, boolean payload, boolean external,
+                String romType, String android, String url, long size, String date,
+                String note, String source, boolean payload, boolean external,
                 Map<String, String> extra) {
             this.version = version;
             this.regionCode = regionCode;
@@ -78,7 +69,6 @@ public final class LocalRomCatalog {
             this.source = source;
             this.payload = payload;
             this.external = external;
-            this.system = system;
             this.extra = extra == null
                     ? Collections.<String, String>emptyMap()
                     : Collections.unmodifiableMap(new LinkedHashMap<>(extra));
@@ -86,32 +76,6 @@ public final class LocalRomCatalog {
 
         public boolean hasLink() {
             return url != null && !url.trim().isEmpty();
-        }
-
-        /**
-         * 版本号主体：{@code 16.0.1.300(CN01)} → {@code 16.0.1.300}。
-         * 没有括号后缀时原样返回。
-         */
-        public String versionBase() {
-            if (version == null || version.isEmpty()) return "";
-            int i = version.lastIndexOf('(');
-            if (i > 0 && version.endsWith(")")) return version.substring(0, i).trim();
-            return version.trim();
-        }
-
-        /**
-         * 版本后缀：{@code 16.0.1.300(CN01)} → {@code CN01}；没有后缀返回空串。
-         *
-         * <p>后缀其实是区域代码（CN01 国行 / EX01 海外印度），与「区域」一级同源，
-         * 单独拆一级是为了让版本号本身更清爽，也便于按后缀精确筛选。
-         */
-        public String versionSuffix() {
-            if (version == null || version.isEmpty()) return "";
-            int i = version.lastIndexOf('(');
-            if (i >= 0 && version.endsWith(")")) {
-                return version.substring(i + 1, version.length() - 1).trim();
-            }
-            return "";
         }
 
         /**
@@ -131,9 +95,6 @@ public final class LocalRomCatalog {
             sb.append(version);
             if (romType != null && !romType.isEmpty()) sb.append(" · ").append(romType);
             if (versionType != null && !versionType.isEmpty()) sb.append(" · ").append(versionType);
-            if (system != null && !system.isEmpty() && !WILDCARD.equals(system)) {
-                sb.append(" · ").append(system);
-            }
             if (region != null && !region.isEmpty()) sb.append(" · ").append(region);
             if (!hasLink()) sb.append(" · 暂无直链");
             else if (external) sb.append(" · 浏览器打开下载页");
@@ -180,18 +141,14 @@ public final class LocalRomCatalog {
         final List<String> regions;
         final List<String> versionTypes;
         final List<String> romTypes;
-        /** 系统版本取值：MIUI 14 / 澎湃OS 3 / ColorOS 16 / OxygenOS 15 … */
-        final List<String> systems;
         final Map<String, List<Device>> byBrand;
 
         Catalog(List<String> brands, List<String> regions, List<String> versionTypes,
-                List<String> romTypes, List<String> systems,
-                Map<String, List<Device>> byBrand) {
+                List<String> romTypes, Map<String, List<Device>> byBrand) {
             this.brands = brands;
             this.regions = regions;
             this.versionTypes = versionTypes;
             this.romTypes = romTypes;
-            this.systems = systems;
             this.byBrand = byBrand;
         }
     }
@@ -261,7 +218,6 @@ public final class LocalRomCatalog {
         List<String> regions = new ArrayList<>();
         List<String> versionTypes = new ArrayList<>();
         List<String> romTypes = new ArrayList<>();
-        List<String> systems = new ArrayList<>();
         Map<String, List<Device>> byBrand = new LinkedHashMap<>();
         try {
             JSONObject root = new JSONObject(readAsset(ctx, "rom_catalog.json"));
@@ -269,7 +225,6 @@ public final class LocalRomCatalog {
             regions = strArray(root.optJSONArray("regions"));
             versionTypes = strArray(root.optJSONArray("versionTypes"));
             romTypes = strArray(root.optJSONArray("romTypes"));
-            systems = strArray(root.optJSONArray("systems"));
             JSONArray arr = root.optJSONArray("devices");
             if (arr != null) {
                 for (int i = 0; i < arr.length(); i++) {
@@ -288,7 +243,7 @@ public final class LocalRomCatalog {
         } catch (Throwable ignored) {
             // 清单损坏时返回空结构，界面会提示"没有数据"
         }
-        return new Catalog(brands, regions, versionTypes, romTypes, systems, byBrand);
+        return new Catalog(brands, regions, versionTypes, romTypes, byBrand);
     }
 
     private static Device deviceOf(String brand, JSONObject o) {
@@ -324,7 +279,6 @@ public final class LocalRomCatalog {
                 o.optString("region", ""),
                 o.optString("versionType", ""),
                 o.optString("romType", ""),
-                o.optString("system", WILDCARD),
                 o.optString("android", ""),
                 o.optString("url", ""),
                 o.optLong("size", 0L),

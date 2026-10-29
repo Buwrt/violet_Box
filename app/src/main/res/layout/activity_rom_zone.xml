@@ -155,29 +155,7 @@
                             android:layout_weight="1" />
                     </LinearLayout>
 
-                    <!-- 5 系统版本（MIUI / 澎湃OS / ColorOS / OxygenOS / realme UI） -->
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal">
-
-                        <TextView
-                            android:layout_width="72dp"
-                            android:layout_height="wrap_content"
-                            android:text="系统版本"
-                            android:textColor="@color/ios_text_primary"
-                            android:textSize="13sp" />
-
-                        <Spinner
-                            android:id="@+id/spSystem"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1" />
-                    </LinearLayout>
-
-                    <!-- 6 系列 -->
+                    <!-- 5 系列 -->
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
@@ -199,7 +177,7 @@
                             android:layout_weight="1" />
                     </LinearLayout>
 
-                    <!-- 7 机型 -->
+                    <!-- 6 机型 -->
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
@@ -216,52 +194,6 @@
 
                         <Spinner
                             android:id="@+id/spDevice"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1" />
-                    </LinearLayout>
-
-                    <!-- 8 版本信息（具体版本号，如 16.0.1.300(CN01)） -->
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal">
-
-                        <TextView
-                            android:layout_width="72dp"
-                            android:layout_height="wrap_content"
-                            android:text="版本信息"
-                            android:textColor="@color/ios_text_primary"
-                            android:textSize="13sp" />
-
-                        <Spinner
-                            android:id="@+id/spVersionInfo"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1" />
-                    </LinearLayout>
-
-                    <!-- 9 版本后缀（CN01 / EX01 …）。没有可选值时整行隐藏 -->
-                    <LinearLayout
-                        android:id="@+id/rowBuildTag"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal"
-                        android:visibility="gone">
-
-                        <TextView
-                            android:layout_width="72dp"
-                            android:layout_height="wrap_content"
-                            android:text="版本后缀"
-                            android:textColor="@color/ios_text_primary"
-                            android:textSize="13sp" />
-
-                        <Spinner
-                            android:id="@+id/spBuildTag"
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1" />
